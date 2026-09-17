@@ -110,7 +110,7 @@ ablation:
       lag_steps: [1, 2, 3, 6, 12]
   experiments:
     models: ["random_forest"]
-    training_cutoff_dates: ["2018-07-21", "2019-07-21", "2020-07-21", "2021-07-21", "2022-07-21", "2023-07-21", "2024-07-21", "2025-07-21"]
+    training_cutoff_dates: ["2025-07-21"]
     autoregressive_values: [false]
     target_types: ["seasonally_differenced"]
     inundation_products: ["viirs"]

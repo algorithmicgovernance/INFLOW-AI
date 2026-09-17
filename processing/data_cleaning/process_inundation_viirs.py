@@ -352,6 +352,11 @@ def process_and_clip_rasters(tif_files, folder_path, catchments):
                     src_band=1,
                     dst_fill=0,
                 )
+                # VIIRS masks are binary. Some source footprints cause GDAL to
+                # preserve the source nodata value (255) during reprojection;
+                # treating any value except the inundated class (1) as dry
+                # prevents nodata/burn artifacts from entering area totals.
+                aligned_masked = (aligned_masked == 1).astype(np.uint8)
 
                 clipped_tif_files.append(aligned_masked)
                 tif_file_names.append(file_name)
@@ -543,7 +548,7 @@ def build_viirs_temporal_dataframe(file_names, clipped_rasters, regions_gdf=None
     """
     Build temporal dataframe from VIIRS rasters.
     """
-    if not clipped_rasters:
+    if len(clipped_rasters) == 0:
         raise ValueError("No clipped VIIRS rasters were provided.")
 
     parsed_records = [parse_viirs_filename(file_name) for file_name in file_names]
@@ -576,6 +581,165 @@ def build_viirs_temporal_dataframe(file_names, clipped_rasters, regions_gdf=None
         inundation_temporal = inundation_temporal.sort_values(sort_cols).reset_index(drop=True)
 
     return inundation_temporal
+
+
+def _viirs_observation_dates(dataframe):
+    """Return the observation dates used by the VIIRS temporal dataframe."""
+    if "period_start" in dataframe.columns:
+        return pd.to_datetime(dataframe["period_start"], errors="coerce")
+    if "date" in dataframe.columns:
+        return pd.to_datetime(dataframe["date"], errors="coerce")
+    if {"year", "month"}.issubset(dataframe.columns):
+        period_order = dataframe.get(
+            "period_order",
+            pd.Series(0, index=dataframe.index),
+        )
+        days = np.where(period_order.eq(VIIRS_PERIOD_ORDER["Shm"]), 16, 1)
+        return pd.to_datetime({
+            "year": dataframe["year"],
+            "month": dataframe["month"],
+            "day": days,
+        }, errors="coerce")
+    raise ValueError("VIIRS temporal data must contain period_start, date, or year/month columns.")
+
+
+def _remove_drying_period_increases(series, dates):
+    """Interpolate anomalous increases within each December-April drying season."""
+    cleaned = pd.to_numeric(series, errors="coerce").copy()
+    dates = pd.to_datetime(dates, errors="coerce")
+
+    # December belongs to the drying season ending in the following calendar year.
+    season_year = dates.dt.year + (dates.dt.month == 12).astype(int)
+    drying = dates.dt.month.isin([12, 1, 2, 3, 4])
+
+    for year in season_year[drying & dates.notna()].unique():
+        season_positions = np.flatnonzero((drying & season_year.eq(year)).to_numpy())
+        if not len(season_positions):
+            continue
+
+        first = season_positions[0]
+        preceding = np.flatnonzero(cleaned.iloc[:first].notna().to_numpy())
+        if len(preceding):
+            anchor = preceding[-1]
+            cursor = 0
+        else:
+            # The historic record may begin part-way through a drying season.
+            # In that case, treat its first observation as the initial anchor.
+            anchor = first
+            cursor = 1
+
+        while cursor < len(season_positions):
+            position = season_positions[cursor]
+            value = cleaned.iloc[position]
+            anchor_value = cleaned.iloc[anchor]
+            if pd.isna(value):
+                cursor += 1
+                continue
+            if value <= anchor_value:
+                anchor = position
+                cursor += 1
+                continue
+
+            # The increasing observations are artifacts. The recovery anchor
+            # may fall just after April, so search all subsequent observations
+            # for the first value that returns to or below the last valid one.
+            endpoint = None
+            for candidate in range(position + 1, len(cleaned)):
+                candidate_value = cleaned.iloc[candidate]
+                if pd.notna(candidate_value) and candidate_value <= anchor_value:
+                    endpoint = candidate
+                    break
+            if endpoint is None:
+                break
+
+            span = endpoint - anchor
+            end_value = cleaned.iloc[endpoint]
+            for interpolated_position in range(anchor + 1, endpoint):
+                fraction = (interpolated_position - anchor) / span
+                cleaned.iloc[interpolated_position] = anchor_value + fraction * (
+                    end_value - anchor_value
+                )
+            anchor = endpoint
+            cursor = np.searchsorted(season_positions, endpoint, side="right")
+
+    return cleaned
+
+
+def clean_viirs_temporal_dataframe(dataframe):
+    """Smooth and remove drying-season artifacts from VIIRS inundation series."""
+    cleaned = dataframe.copy()
+    dates = _viirs_observation_dates(cleaned)
+    value_columns = [column for column in cleaned if column.startswith("percent_inundation")]
+
+    for column in value_columns:
+        smoothed = pd.to_numeric(cleaned[column], errors="coerce").rolling(
+            window=3,
+            center=True,
+            min_periods=1,
+        ).median()
+        cleaned[column] = _remove_drying_period_increases(smoothed, dates)
+
+    return cleaned
+
+
+def rebuild_viirs_history(download_path=VIIRS_DOWNLOAD_PATH,
+                          h5_file_path=VIIRS_H5_PATH,
+                          temporal_data_path=VIIRS_TEMPORAL_PATH):
+    """Rebuild the complete VIIRS HDF5 and temporal CSV from local TIFF files."""
+    tif_files = get_sorted_tif_files(download_path)
+    if not tif_files:
+        raise FileNotFoundError(f"No VIIRS TIFF files found in {download_path}.")
+
+    catchments = load_shapefile(INFLOW_CATCHMENTS_PATH)
+    if catchments is None or catchments.empty:
+        raise ValueError(f"No catchment geometries found in {INFLOW_CATCHMENTS_PATH}.")
+
+    clipped_rasters, file_names, _ = process_and_clip_rasters(
+        tif_files,
+        download_path,
+        catchments,
+    )
+    if len(clipped_rasters) != len(tif_files):
+        raise RuntimeError(
+            f"Processed {len(clipped_rasters)} of {len(tif_files)} VIIRS TIFF files; "
+            "refusing to replace historic outputs with an incomplete rebuild."
+        )
+
+    regions_gdf = cleaning_utils.extract_regions()
+    temporal = build_viirs_temporal_dataframe(
+        file_names,
+        clipped_rasters,
+        regions_gdf=regions_gdf,
+    )
+    temporal = clean_viirs_temporal_dataframe(temporal)
+
+    os.makedirs(os.path.dirname(h5_file_path), exist_ok=True)
+    os.makedirs(os.path.dirname(temporal_data_path), exist_ok=True)
+    temp_h5_path = f"{h5_file_path}.rebuild"
+    temp_csv_path = f"{temporal_data_path}.rebuild"
+    try:
+        with h5py.File(temp_h5_path, "w") as hdf:
+            hdf.create_dataset(
+                VIIRS_DSET_NAME,
+                data=np.asarray(clipped_rasters, dtype=np.uint8),
+                maxshape=(None, *clipped_rasters[0].shape),
+                chunks=True,
+            )
+        temporal.to_csv(temp_csv_path, index=False)
+        os.replace(temp_h5_path, h5_file_path)
+        os.replace(temp_csv_path, temporal_data_path)
+    finally:
+        for temp_path in (temp_h5_path, temp_csv_path):
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    logging.info(
+        "Rebuilt VIIRS history: %d observations written to %s and %s.",
+        len(temporal),
+        h5_file_path,
+        temporal_data_path,
+    )
+    return temporal
 
 
 def update_inundation(h5_file_path=VIIRS_H5_PATH,
@@ -685,8 +849,9 @@ def update_inundation(h5_file_path=VIIRS_H5_PATH,
             viirs_temporal_new["date"] = pd.to_datetime(viirs_temporal_new["date"], errors="coerce")
             viirs_temporal_new = viirs_temporal_new.sort_values("date").reset_index(drop=True)
 
-        os.makedirs(os.path.dirname(VIIRS_TEMPORAL_PATH), exist_ok=True)
-        viirs_temporal_new.to_csv(VIIRS_TEMPORAL_PATH, index=False)
+        viirs_temporal_new = clean_viirs_temporal_dataframe(viirs_temporal_new)
+        os.makedirs(os.path.dirname(temporal_data_path), exist_ok=True)
+        viirs_temporal_new.to_csv(temporal_data_path, index=False)
 
     except Exception as e:
         logging.error(f"Error processing new VIIRS data: {e}")
