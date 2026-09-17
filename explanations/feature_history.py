@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from model.ablation.data_pipeline import _build_temporal_feature_table
 from processing.config import get_cfg
+from explanations.variable_names import human_readable_variable_name
 
 
 def _calendar_day_axis(dates: pd.Series) -> np.ndarray:
@@ -87,7 +88,8 @@ def export_feature_history_plots(row: dict[str, Any], output_dir: str | Path) ->
     for feature_name in tqdm(predictor_names, desc="Plotting feature histories"):
         safe_name = feature_name.replace("/", "_").replace(" ", "_")
         output_path = feature_history_dir / f"{safe_name}_year_by_year_comparison.png"
-        _plot_year_by_year(raw_temporal[feature_name], feature_name, output_path)
+        display_name = human_readable_variable_name(feature_name, product)
+        _plot_year_by_year(raw_temporal[feature_name], display_name, output_path)
         if output_path.exists():
             generated.append(output_path)
 

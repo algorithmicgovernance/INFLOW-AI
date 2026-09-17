@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from tqdm import tqdm
 from processing import cleaning_utils
+from explanations.variable_names import human_readable_variable_name
 
 
 def create_dataframe():
@@ -160,9 +161,10 @@ def export_graphs_all_vars(data, explainer_vars):
                     fontsize=9,
                     va='center')
 
-        ax.set_title(f"{var}: {start_label} to {end_label} ({datetime.today().year} highlighted)")
+        display_name = human_readable_variable_name(var, "viirs")
+        ax.set_title(f"{display_name}: {start_label} to {end_label} ({datetime.today().year} highlighted)")
         ax.set_xlabel('Month of Year')
-        ax.set_ylabel(var)
+        ax.set_ylabel(display_name)
 
         months = pd.date_range(start=f"{datetime.today().year}-01-01", periods=12, freq='MS')
         month_days = [d.dayofyear for d in months]

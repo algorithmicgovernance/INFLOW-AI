@@ -20,6 +20,7 @@ from model.ablation.deployment import (
 )
 from model.ablation.data_pipeline import _build_temporal_feature_table, _target_transform
 from model.ablation.area_reconversion import target_area_scale_km2
+from explanations.variable_names import human_readable_variable_name
 
 
 def export_lead_waterfall_plots(row: dict[str, Any], output_dir: str | Path) -> list[Path]:
@@ -143,7 +144,7 @@ def export_lead_waterfall_plots(row: dict[str, Any], output_dir: str | Path) -> 
             values=signed_contribution_shares,
             base_values=raw_base_value,
             data=x_latest[0],
-            feature_names=selected_features,
+            feature_names=[human_readable_variable_name(name, product) for name in selected_features],
         )
         plt.figure(figsize=(11, 8))
         shap.plots.waterfall(explanation, max_display=min(20, len(selected_features)), show=False)
