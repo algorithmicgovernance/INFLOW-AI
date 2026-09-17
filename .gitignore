@@ -9,3 +9,7 @@ model/testing/
 *.ipynb
 __pycache__/
 .ipynb_checkpoints/
+
+# Deployment artifacts required by the model
+!model/ablation/artifacts/scalers/*.pkl
+!model/ablation/artifacts/experiment_weights/*.pkl
