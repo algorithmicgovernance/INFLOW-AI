@@ -378,7 +378,8 @@ def export_graphs(bundle) -> list[Path]:
                 upper_pred = upper_series.reindex(predicted_group["date"]).to_numpy(dtype=np.float64)
 
                 if anchor_day is not None and anchor_km2 is not None:
-                    # Draw a guaranteed connector segment at the handoff point.
+                    # Include the handoff to the first predicted period in the
+                    # dashed forecast, matching the other prediction plots.
                     first_pred_day = pred_days.iloc[0] if len(pred_days) > 0 else None
                     if first_pred_day is None:
                         raise RuntimeError("Predicted group is unexpectedly empty while building the year-by-year plot.")
@@ -386,7 +387,7 @@ def export_graphs(bundle) -> list[Path]:
                         [anchor_day, first_pred_day],
                         [anchor_km2, pred_km2[0]],
                         color="#d62728",
-                        linestyle="-",
+                        linestyle="--",
                         linewidth=2.0,
                         label="_nolegend_",
                     )
