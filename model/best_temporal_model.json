@@ -129,12 +129,12 @@
   "metrics_target_space": "raw",
   "model_architecture": "random_forest",
   "model_type": "random_forest",
-  "model_weights_path": "model/ablation/artifacts/runtime_retrained_weights/random_forest_viirs_seasonally_differenced_runtime_fullhistory_lead4_20260917T173818Z.pkl",
+  "model_weights_path": "model/ablation/artifacts/runtime_retrained_weights/random_forest_viirs_seasonally_differenced_runtime_fullhistory_lead4_20261013T110200Z.pkl",
   "model_weights_path_by_lead": {
-    "1": "model/ablation/artifacts/runtime_retrained_weights/random_forest_viirs_seasonally_differenced_runtime_fullhistory_lead1_20260917T173818Z.pkl",
-    "2": "model/ablation/artifacts/runtime_retrained_weights/random_forest_viirs_seasonally_differenced_runtime_fullhistory_lead2_20260917T173818Z.pkl",
-    "3": "model/ablation/artifacts/runtime_retrained_weights/random_forest_viirs_seasonally_differenced_runtime_fullhistory_lead3_20260917T173818Z.pkl",
-    "4": "model/ablation/artifacts/runtime_retrained_weights/random_forest_viirs_seasonally_differenced_runtime_fullhistory_lead4_20260917T173818Z.pkl"
+    "1": "model/ablation/artifacts/runtime_retrained_weights/random_forest_viirs_seasonally_differenced_runtime_fullhistory_lead1_20261013T110200Z.pkl",
+    "2": "model/ablation/artifacts/runtime_retrained_weights/random_forest_viirs_seasonally_differenced_runtime_fullhistory_lead2_20261013T110200Z.pkl",
+    "3": "model/ablation/artifacts/runtime_retrained_weights/random_forest_viirs_seasonally_differenced_runtime_fullhistory_lead3_20261013T110200Z.pkl",
+    "4": "model/ablation/artifacts/runtime_retrained_weights/random_forest_viirs_seasonally_differenced_runtime_fullhistory_lead4_20261013T110200Z.pkl"
   },
   "peak_auc": NaN,
   "peak_f1": 0.0,
@@ -148,7 +148,7 @@
   "rmse": 0.015385314570187152,
   "roc_auc": NaN,
   "run_id": "20260917T173135Z",
-  "runtime_retrained_at": "20260917T173818Z",
+  "runtime_retrained_at": "20261013T110200Z",
   "runtime_retrained_until_target_date": "2026-08-16",
   "seed": 42,
   "selected_feature_count": 32,

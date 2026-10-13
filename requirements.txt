@@ -8,7 +8,7 @@ matplotlib==3.10.0
 netCDF4==1.7.2
 numpy>=2.0.0
 pandas==3.0.1
-py_hydroweb==1.0.2
+py_hydroweb==1.3.3
 rasterio==1.4.3
 requests==2.32.4
 PyYAML>=6.0.1

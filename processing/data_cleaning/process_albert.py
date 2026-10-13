@@ -47,8 +47,18 @@ def download_and_extract_data(bounding_box, output_file_path, zip_filename=ALBER
     basket = py_hydroweb.DownloadBasket("my_download_basket")
     basket.add_collection(ALBERT_COLLECTION, bbox=bounding_box)
     
-    downloaded_zip_path = client.submit_and_download_zip(
-        basket, zip_filename=zip_filename)
+    try:
+        downloaded_zip_path = client.submit_and_download_zip(
+            basket, zip_filename=zip_filename)
+    except Exception as e:
+        # Hydroweb currently returns an empty selection for Lake Albert; py_hydroweb then fails with a 'seek' error.
+        cached_path = os.path.join(os.getcwd(), output_file_path)
+        if os.path.exists(cached_path):
+            logging.warning(f"Hydroweb download failed ({e}); using cached Lake Albert file at {cached_path} (may be stale).")
+            return cached_path
+        raise FileNotFoundError(
+            "Hydroweb returned no Lake Albert data and no cached file exists."
+        ) from e
     
     with zipfile.ZipFile(downloaded_zip_path, 'r') as zip_ref:
         files_in_zip = zip_ref.namelist()

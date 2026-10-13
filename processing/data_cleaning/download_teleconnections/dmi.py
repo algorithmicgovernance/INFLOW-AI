@@ -40,7 +40,10 @@ def download_dmi(
 
 def import_dmi():
     # Import dmi dataset
-    df_dmi = pd.read_table(DMI_FILE_PATH, sep=r"\s+", skiprows=8)
+    # Locate the header row, as the preamble length changes between releases
+    with DMI_FILE_PATH.open(encoding="utf-8") as fp:
+        header_row = next(i for i, line in enumerate(fp) if line.split()[:2] == ["Year", "Month"])
+    df_dmi = pd.read_table(DMI_FILE_PATH, sep=r"\s+", skiprows=header_row)
     return df_dmi
 
 
