@@ -1,4 +1,4 @@
-from model.ablation.experiment_runner import build_feature_ablation_configs
+from model.ablation.temporal_ablation_runner import build_temporal_feature_ablation_configs
 
 
 def test_feature_ablation_skips_fixed_and_effective_duplicates_for_non_ar_model():
@@ -21,7 +21,7 @@ def test_feature_ablation_skips_fixed_and_effective_duplicates_for_non_ar_model(
         {"name": "no_ecmwf", "include_ecmwf_hindcasts": False,
          "include_target_lag_features": True, "include_feature_lag_features": True},
     ]
-    configs = build_feature_ablation_configs(top, blocks, fixed)
+    configs = build_temporal_feature_ablation_configs(top, blocks, fixed)
     assert [config.feature_block_name for config in configs] == ["no_ecmwf"]
     assert configs[0].ablation_stage == "feature_blocks"
 
@@ -42,6 +42,6 @@ def test_feature_ablation_keeps_target_lag_removal_for_ar_model():
     }
     blocks = [{"name": "no_target_lags", "include_ecmwf_hindcasts": True,
                "include_target_lag_features": False, "include_feature_lag_features": True}]
-    configs = build_feature_ablation_configs(top, blocks, fixed)
+    configs = build_temporal_feature_ablation_configs(top, blocks, fixed)
     assert len(configs) == 1
     assert configs[0].include_target_lag_features is False

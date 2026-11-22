@@ -1,5 +1,13 @@
-"""Ablation framework for temporal inundation model experiments."""
+"""Temporal inundation model ablation framework."""
 
-from .experiment_runner import AblationConfig, run_ablation_grid
+from .temporal_ablation_runner import TemporalAblationConfig, run_temporal_ablation_grid
 
-__all__ = ["AblationConfig", "run_ablation_grid"]
+AblationConfig = TemporalAblationConfig
+run_ablation_grid = run_temporal_ablation_grid
+
+__all__ = [
+    "TemporalAblationConfig",
+    "run_temporal_ablation_grid",
+    "AblationConfig",
+    "run_ablation_grid",
+]

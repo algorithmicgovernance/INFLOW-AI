@@ -23,7 +23,7 @@ import h5py
 import numpy as np
 
 from processing import cleaning_utils
-from processing.config import get_cfg
+from processing.config import get_cfg, resolve_forecast_horizon_periods
 from .channels import CHANNEL_NAMES, ecmwf_patch, load_glofas_grid
 
 
@@ -138,7 +138,7 @@ def _sequence_class(tf):
     class SpatialSequence(tf.keras.utils.Sequence):
         def __init__(
             self, paths, samples, static, sequence_length, patch_size, batch_size,
-            shuffle, seed, hdf5_cache_mb,
+            shuffle, seed, hdf5_cache_mb, forecast_horizon,
         ):
             super().__init__()
             self.paths = paths
@@ -147,6 +147,7 @@ def _sequence_class(tf):
             self.sequence_length = int(sequence_length)
             self.patch_size = int(patch_size)
             self.batch_size = int(batch_size)
+            self.forecast_horizon = int(forecast_horizon)
             self.shuffle = bool(shuffle)
             self.rng = np.random.default_rng(seed)
             self.order = np.arange(len(self.samples))
@@ -195,7 +196,10 @@ def _sequence_class(tf):
                 (len(batch), self.sequence_length, self.patch_size, self.patch_size, len(CHANNEL_NAMES)),
                 dtype=np.float32,
             )
-            y = np.empty((len(batch), self.patch_size, self.patch_size, 1), dtype=np.float32)
+            y = np.empty(
+                (len(batch), self.forecast_horizon, self.patch_size, self.patch_size, 1),
+                dtype=np.float32,
+            )
             with self._lock:
                 inun_hf, rain_hf, moist_hf, ecmwf_hf = self._open_files()
                 inundation = inun_hf["inundation"]
@@ -219,13 +223,16 @@ def _sequence_class(tf):
                             ecmwf, time_index, int(row), int(col), self.patch_size,
                             source_transform, source_crs,
                         )
-                    y[index, ..., 0] = inundation[target_time, row_slice, col_slice]
+                    target_end = int(target_time) + self.forecast_horizon
+                    y[index, ..., 0] = inundation[target_time:target_end, row_slice, col_slice]
             return np.nan_to_num(x, copy=False), np.clip(np.nan_to_num(y, copy=False), 0.0, 1.0)
 
     return SpatialSequence
 
 
-def _build_model(tf, sequence_length: int, patch_size: int, filters: list[int]):
+def _build_model(
+    tf, sequence_length: int, patch_size: int, filters: list[int], forecast_horizon: int
+):
     model = tf.keras.Sequential(name="spatial_convlstm")
     model.add(tf.keras.Input(shape=(sequence_length, patch_size, patch_size, len(CHANNEL_NAMES))))
     for index, count in enumerate(filters):
@@ -239,8 +246,10 @@ def _build_model(tf, sequence_length: int, patch_size: int, filters: list[int]):
         model.add(tf.keras.layers.BatchNormalization())
     # Keep probabilities/loss in float32 even when GPU mixed precision is enabled.
     model.add(tf.keras.layers.Conv2D(
-        1, (3, 3), activation="sigmoid", padding="same", dtype="float32"
+        forecast_horizon, (3, 3), activation="sigmoid", padding="same", dtype="float32"
     ))
+    model.add(tf.keras.layers.Permute((3, 1, 2)))
+    model.add(tf.keras.layers.Reshape((forecast_horizon, patch_size, patch_size, 1)))
     model.compile(optimizer=tf.keras.optimizers.Adam(), loss="mean_squared_error", metrics=["mae"])
     return model
 
@@ -255,12 +264,15 @@ def train(output: str | None = None) -> Path:
     paths = _paths(product, output)
     total_times, height, width = _validate_inputs(paths)
     sequence_length = int(get_cfg("spatial_training.sequence_length", 6))
+    forecast_horizon = resolve_forecast_horizon_periods()
     patch_size = int(get_cfg("spatial_training.patch_size", 64))
     stride = int(get_cfg("spatial_training.stride", 32))
     patches_per_timestep = int(get_cfg("spatial_training.patches_per_timestep", 16))
     batch_size = int(get_cfg("spatial_training.batch_size", 2))
     hdf5_cache_mb = int(get_cfg("spatial_training.hdf5_cache_mb", 64))
-    epochs = int(get_cfg("spatial_training.epochs", 20))
+    max_epochs = int(get_cfg(
+        "spatial_training.max_epochs", get_cfg("spatial_training.epochs", 200)
+    ))
     validation_fraction = float(get_cfg("spatial_training.validation_fraction", 0.2))
     seed = int(get_cfg("spatial_training.seed", 42))
     filters = [int(value) for value in get_cfg("spatial_training.filters", [32])]
@@ -274,49 +286,97 @@ def train(output: str | None = None) -> Path:
         tf.keras.mixed_precision.set_global_policy("mixed_float16")
     first_target = sequence_length
     split_time = int(round(total_times * (1.0 - validation_fraction)))
-    if split_time <= first_target or split_time >= total_times:
+    last_target_exclusive = total_times - forecast_horizon + 1
+    train_target_end = split_time - forecast_horizon + 1
+    if train_target_end <= first_target or split_time >= last_target_exclusive:
         raise RuntimeError("Not enough time periods for the configured chronological split.")
     train_samples = _sample_index(
-        range(first_target, split_time), height, width, patch_size, stride,
+        range(first_target, train_target_end), height, width, patch_size, stride,
         patches_per_timestep=patches_per_timestep, seed=seed,
     )
     validation_samples = _sample_index(
-        range(split_time, total_times), height, width, patch_size, stride,
+        range(split_time, last_target_exclusive), height, width, patch_size, stride,
         patches_per_timestep=patches_per_timestep, seed=seed + 1,
     )
     static = _load_static(paths, height, width)
     Sequence = _sequence_class(tf)
     train_data = Sequence(
         paths, train_samples, static, sequence_length, patch_size, batch_size,
-        True, seed, hdf5_cache_mb,
+        True, seed, hdf5_cache_mb, forecast_horizon,
     )
     validation_data = Sequence(
         paths, validation_samples, static, sequence_length, patch_size, batch_size,
-        False, seed, hdf5_cache_mb,
+        False, seed, hdf5_cache_mb, forecast_horizon,
     )
 
     LOG.info(
-        "Training %s ConvLSTM: %d periods, %d train patches, %d validation patches, grid=%dx%d",
-        product.upper(), total_times, len(train_samples), len(validation_samples), height, width,
+        "Training %s ConvLSTM: %d periods, %d future leads, %d train patches, "
+        "%d validation patches, grid=%dx%d",
+        product.upper(), total_times, forecast_horizon, len(train_samples),
+        len(validation_samples), height, width,
     )
-    model = _build_model(tf, sequence_length, patch_size, filters)
+    model = _build_model(tf, sequence_length, patch_size, filters, forecast_horizon)
     paths.model.parent.mkdir(parents=True, exist_ok=True)
+    configured_backup_dir = str(get_cfg("spatial_training.backup_dir", "")).strip()
+    backup_dir = Path(configured_backup_dir) if configured_backup_dir else (
+        paths.model.parent / f".{paths.model.stem}_training_backup"
+    )
     callbacks = [
-        tf.keras.callbacks.ModelCheckpoint(paths.model, monitor="val_loss", save_best_only=True),
+        # This is the only published model artifact. It is replaced solely when
+        # validation loss improves.
+        tf.keras.callbacks.ModelCheckpoint(
+            paths.model,
+            monitor="val_loss",
+            mode="min",
+            save_best_only=True,
+            save_weights_only=False,
+            verbose=1,
+        ),
+        # Training-state backup supports resuming an interrupted fit. It is not
+        # a candidate model and is deleted automatically after successful fit.
+        tf.keras.callbacks.BackupAndRestore(
+            backup_dir=str(backup_dir),
+            save_freq=int(get_cfg("spatial_training.backup_frequency_batches", 100)),
+            double_checkpoint=True,
+            delete_checkpoint=True,
+        ),
         tf.keras.callbacks.EarlyStopping(
             monitor="val_loss",
-            patience=int(get_cfg("spatial_training.early_stopping_patience", 5)),
+            patience=int(get_cfg("spatial_training.early_stopping_patience", 10)),
+            min_delta=float(get_cfg("spatial_training.early_stopping_min_delta", 1.0e-5)),
             restore_best_weights=True,
+            verbose=1,
+        ),
+        tf.keras.callbacks.ReduceLROnPlateau(
+            monitor="val_loss", factor=0.5,
+            patience=max(2, int(get_cfg("spatial_training.early_stopping_patience", 10)) // 2),
+            min_lr=1.0e-6, verbose=1,
         ),
     ]
-    history = model.fit(train_data, validation_data=validation_data, epochs=epochs, callbacks=callbacks)
-    model.save(paths.model)
-    train_data.close()
-    validation_data.close()
+    try:
+        history = model.fit(
+            train_data, validation_data=validation_data, epochs=max_epochs, callbacks=callbacks
+        )
+    except KeyboardInterrupt:
+        LOG.warning(
+            "Training interrupted. The best completed validation checkpoint remains at %s; "
+            "rerun the command to resume from %s.",
+            paths.model,
+            backup_dir,
+        )
+        raise
+    finally:
+        train_data.close()
+        validation_data.close()
+    # Reload the published checkpoint so downstream validation always evaluates
+    # the best epoch, regardless of why fitting stopped.
+    model = tf.keras.models.load_model(paths.model)
     metadata_path = paths.model.with_suffix(".training.json")
     metadata_path.write_text(json.dumps({
         "target_product": product,
         "sequence_length": sequence_length,
+        "forecast_horizon_periods": forecast_horizon,
+        "output_shape": [forecast_horizon, patch_size, patch_size, 1],
         "patch_size": patch_size,
         "stride": stride,
         "patches_per_timestep": patches_per_timestep,
@@ -327,6 +387,9 @@ def train(output: str | None = None) -> Path:
         "history": {key: [float(v) for v in values] for key, values in history.history.items()},
     }, indent=2), encoding="utf-8")
     LOG.info("Saved best spatial model to %s", paths.model)
+    if bool(get_cfg("spatial_validation.enabled", True)):
+        from .evaluate_spatial_model import evaluate_spatial_model
+        evaluate_spatial_model(model=model, model_path=str(paths.model))
     return paths.model
 
 

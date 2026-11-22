@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from model.ablation.data_pipeline import _build_temporal_feature_table
+from model.ablation.temporal_data_pipeline import _build_temporal_feature_table
 from processing.config import get_cfg
 from explanations.variable_names import human_readable_variable_name
 

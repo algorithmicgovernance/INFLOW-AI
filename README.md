@@ -21,18 +21,18 @@ python3 -m pip install -r requirements.txt
 ## First Run
 
 1. Review [config.yaml](config.yaml), especially `runtime.target_product`.
-2. Download and process the datasets required for ablation testing. This uses
+2. Download and process the datasets required for temporal-model ablation testing. This uses
    `runtime.target_product` from `config.yaml` and does not require an existing
    trained model:
 
 ```bash
-python3 -m model.ablation.prepare_data
+python3 -m model.ablation.prepare_temporal_data
 ```
 
-3. Run the ablation experiments:
+3. Run the temporal-model ablation experiments:
 
 ```bash
-python3 -m model.ablation.run_ablation
+python3 -m model.ablation.run_temporal_ablation
 ```
 
 4. Run the prediction pipeline:
@@ -60,6 +60,21 @@ Spatial samples remain grouped by timestep so HDF5 chunks are decompressed once
 and reused across patches. `spatial_training.hdf5_cache_mb`, `batch_size`,
 `patches_per_timestep`, and optional GPU `mixed_precision` can be tuned for the
 available hardware.
+The model emits every configured future dekad simultaneously. Training has a
+maximum epoch ceiling, but early stopping restores the best validation-loss
+weights and stops only after validation has failed to improve for the configured
+patience.
+Only validation-loss improvements replace `model/spatial_model.keras`.
+Resumable training state is backed up periodically and is kept separate from
+the published best model; rerunning the same command resumes an interrupted fit.
+After training, spatial validation compares the ConvLSTM with persistence and
+GloFAS 20-year/100-year return-period baselines. For every tile and lead, each
+method is assigned the observed number of inundated pixels by selecting its
+highest-scoring pixels. Binary flood metrics and dry/flood transition metrics
+are written to `model/spatial_model.validation.csv` and `.validation.json`.
+The two large GloFAS source rasters are not committed to Git and must exist at
+the paths configured under `spatial_validation` (copy them into the same paths
+when training in Colab).
 
 The first data run takes substantially longer. It downloads and builds the historic record for the spatial and temporal datasets, including HDF5 files and aligned temporal CSVs. Later runs update only the available period.
 
@@ -90,7 +105,17 @@ runtime:
 
 The target product controls the inundation source, aligned historic directory, temporal cadence, and forecast target.
 
-### Ablation experiments
+The shared horizon setting controls both temporal and spatial forecasts:
+
+```yaml
+forecast:
+  horizon_periods: 6
+```
+
+Temporal models forecast six dekads, while the ConvLSTM emits six matching maps
+with output shape `(batch, 6, height, width, 1)`.
+
+### Temporal-model ablation experiments
 
 The `ablation.experiments` section controls the experiment grid:
 
@@ -139,13 +164,17 @@ retraining and forecast path currently accepts lead-specific tabular models.
 
 Experiment weights, scalers, feature-selection caches, PCA artifacts, and runtime-retrained weights are stored beneath the configured `ablation.artifacts.base_dir`.
 
-## Ablation Results
+## Temporal-model ablation results
 
 The ablation runner records experiment metadata and metrics in:
 
 ```text
 model/ablation/ablation_experiment_log.csv
 ```
+
+The `model/ablation` artifact directory and `ablation` configuration key are
+retained for compatibility with existing experiment logs and saved models;
+canonical Python modules and commands now use explicit `temporal` names.
 
 It stores the selected experiment metadata in:
 

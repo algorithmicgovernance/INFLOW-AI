@@ -30,7 +30,7 @@
 
 - [x] Add GloFAS data
 - [x] Improve efficiency of data extraction and training for spatial model
-- [ ] Retrain spatial model with VIIRS, ECMWF, and GloFAS
+- [x] Retrain spatial model with VIIRS, ECMWF, and GloFAS
 - [ ] Retrain spatial model and validate using VIIRS data
 - [ ] Train spatial model again on full data set and deploy
 - [ ] Ensure exposure layer is still used and reported on for the spatial model

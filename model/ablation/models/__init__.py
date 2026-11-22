@@ -4,7 +4,7 @@ from .linear_regression import LinearRegressionAblationModel
 from .random_forest_model import RandomForestAblationModel
 from .transformer_model import TransformerAblationModel
 
-MODEL_REGISTRY = {
+TEMPORAL_MODEL_REGISTRY = {
     RandomForestAblationModel.model_type: RandomForestAblationModel,
     GradientBoostingAblationModel.model_type: GradientBoostingAblationModel,
     LinearRegressionAblationModel.model_type: LinearRegressionAblationModel,
@@ -12,4 +12,6 @@ MODEL_REGISTRY = {
     TransformerAblationModel.model_type: TransformerAblationModel,
 }
 
-__all__ = ["MODEL_REGISTRY"]
+MODEL_REGISTRY = TEMPORAL_MODEL_REGISTRY
+
+__all__ = ["TEMPORAL_MODEL_REGISTRY", "MODEL_REGISTRY"]

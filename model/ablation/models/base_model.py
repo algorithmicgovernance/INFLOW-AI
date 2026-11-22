@@ -6,8 +6,8 @@ import joblib
 import numpy as np
 
 
-class AblationModel(ABC):
-    """Base class that enforces a common interface for ablation models."""
+class TemporalAblationModel(ABC):
+    """Base interface for temporal inundation ablation models."""
 
     model_type: str
 
@@ -32,3 +32,6 @@ class AblationModel(ABC):
         if self.model is None:
             raise RuntimeError("Model is not initialized.")
         joblib.dump(self.model, path)
+
+
+AblationModel = TemporalAblationModel

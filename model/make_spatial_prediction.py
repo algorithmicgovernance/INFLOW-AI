@@ -26,7 +26,7 @@ from matplotlib.lines import Line2D
 import zipfile
 from processing.data_cleaning import process_inundation_modis
 from processing import cleaning_utils
-from processing.config import get_cfg
+from processing.config import get_cfg, resolve_forecast_horizon_periods
 from model.spatial.channels import CHANNEL_NAMES, ecmwf_patch, load_glofas_grid
 
 # Configure logging
@@ -57,14 +57,13 @@ def generate_deployment_sequences_in_memory(
     patch_size=64,
     stride=32,
     sequence_length=6,
-    forecast_length=6,
-    num_timesteps=1):
+    forecast_horizon=None):
     """
     Generates deployment-ready spatial sequences (in memory) for the last available time slices.
 
     Returns:
         X: np.ndarray of shape (N, sequence_length, 10, patch_size, patch_size)
-        indices: np.ndarray of shape (N, 3) where each row is (t, y, x)
+        indices: np.ndarray of shape (N, 3) where each row is (origin, y, x)
     """
 
     inun_len, rain_len, moist_len = check_file_lengths(
@@ -81,6 +80,7 @@ def generate_deployment_sequences_in_memory(
         logger.warning(f"  - ECMWF:      {ecmwf_len}")
     
     T = min(inun_len, rain_len, moist_len, ecmwf_len)
+    forecast_horizon = int(forecast_horizon or resolve_forecast_horizon_periods())
     
     if not (inun_len == rain_len == moist_len == ecmwf_len):
         logger.info(f"Using shortest time series ({T}) as reference.")
@@ -111,16 +111,16 @@ def generate_deployment_sequences_in_memory(
         basin_attributes = basin_attributes[:, :H, :W]
         glofas = load_glofas_grid(glofas_file_path, H, W)
 
-        # Define time window
-        start_t = T - (num_timesteps + sequence_length + forecast_length)
-        end_t = T - forecast_length
+        # Use all observations through the latest period. The model emits one
+        # map for every configured future temporal-model horizon.
+        start_t = T - sequence_length
+        end_t = T
 
         y_positions = np.arange(0, H - patch_size + 1, stride)
         x_positions = np.arange(0, W - patch_size + 1, stride)
 
-        num_time_steps = end_t - start_t
         num_spatial_patches = len(y_positions) * len(x_positions)
-        total_samples = num_time_steps * num_spatial_patches
+        total_samples = num_spatial_patches
 
         logger.info(f"Generating {total_samples} input samples from time {start_t} to {end_t}...")
 
@@ -133,15 +133,15 @@ def generate_deployment_sequences_in_memory(
 
         sample_idx = 0
 
-        t = end_t - 1  # Only the final timestep
+        origin = T - 1
         for y_start in y_positions:
             for x_start in x_positions:
                 y_end = y_start + patch_size
                 x_end = x_start + patch_size
 
-                inun_seq = inundation[t:t+sequence_length, y_start:y_end, x_start:x_end]
-                rain_seq = rainfall[t:t+sequence_length, y_start:y_end, x_start:x_end]
-                moist_seq = moisture[t:t+sequence_length, y_start:y_end, x_start:x_end]
+                inun_seq = inundation[start_t:end_t, y_start:y_end, x_start:x_end]
+                rain_seq = rainfall[start_t:end_t, y_start:y_end, x_start:x_end]
+                moist_seq = moisture[start_t:end_t, y_start:y_end, x_start:x_end]
 
                 elev_patch = elevation[:, y_start:y_end, x_start:x_end]
                 basin_patch = basin_attributes[:, y_start:y_end, x_start:x_end]
@@ -154,7 +154,7 @@ def generate_deployment_sequences_in_memory(
                         ecmwf, time_index, y_start, x_start, patch_size,
                         ecmwf_transform, ecmwf_crs,
                     ).transpose(2, 0, 1)
-                    for time_index in range(t, t + sequence_length)
+                    for time_index in range(start_t, end_t)
                 ])
 
                 X_sample = np.zeros(
@@ -166,7 +166,7 @@ def generate_deployment_sequences_in_memory(
                 X_sample[:, 5:9] = ecmwf_seq
                 X_sample[:, 9] = glofas_seq
                 X[sample_idx] = X_sample
-                indices[sample_idx] = (t, y_start, x_start)
+                indices[sample_idx] = (origin, y_start, x_start)
                 sample_idx += 1
 
     logger.info(f"✅ In-memory sequence generation complete: {X.shape} samples")
@@ -192,7 +192,11 @@ def masked_binary_focal_loss(gamma=2., alpha=0.25, border=4):
 
 
 def crop_borders(arr, border=4):
-    return arr[:, border:-border, border:-border, :]
+    if arr.ndim == 4:
+        return arr[:, border:-border, border:-border, :]
+    if arr.ndim == 5:
+        return arr[:, :, border:-border, border:-border, :]
+    raise ValueError(f"Expected 4D or 5D spatial predictions, got shape {arr.shape}.")
 
 
 def load_trained_model(model_path, gamma=3.0, alpha=0.95):
@@ -231,21 +235,27 @@ def predict_with_model(model, X, batch_size=32):
 def reconstruct_maps(y_pred, indices, full_shape, border=4):
     logger.info("Reconstructing full maps from predicted patches...")
 
-    patch_size = y_pred.shape[1]
+    if y_pred.ndim == 4:
+        y_pred = y_pred[:, np.newaxis, ...]
+    if y_pred.ndim != 5:
+        raise ValueError(f"Expected predictions shaped (patch, lead, y, x, channel), got {y_pred.shape}.")
+    patch_size = y_pred.shape[2]
+    horizon_count = y_pred.shape[1]
     y_pred_cropped = crop_borders(y_pred, border=border)
     cropped_size = patch_size - 2 * border
 
-    time_to_patches = defaultdict(list)
-    for i, (t, y, x) in enumerate(indices):
-        patch = y_pred_cropped[i, :, :, 0]
-        y0 = y + border
-        x0 = x + border
-        y1 = y0 + cropped_size
-        x1 = x0 + cropped_size
-        time_to_patches[t].append((patch, y0, y1, x0, x1))
+    lead_to_patches = defaultdict(list)
+    for i, (_, y, x) in enumerate(indices):
+        for lead in range(horizon_count):
+            patch = y_pred_cropped[i, lead, :, :, 0]
+            y0 = y + border
+            x0 = x + border
+            y1 = y0 + cropped_size
+            x1 = x0 + cropped_size
+            lead_to_patches[lead + 1].append((patch, y0, y1, x0, x1))
 
     time_maps = {}
-    for t, patches in time_to_patches.items():
+    for lead, patches in lead_to_patches.items():
         sum_map = np.zeros(full_shape, dtype=np.float32)
         count_map = np.zeros(full_shape, dtype=np.uint8)
 
@@ -256,7 +266,7 @@ def reconstruct_maps(y_pred, indices, full_shape, border=4):
         with np.errstate(divide='ignore', invalid='ignore'):
             avg_map = np.true_divide(sum_map, count_map)
             avg_map[count_map == 0] = np.nan
-        time_maps[t] = avg_map
+        time_maps[lead] = avg_map
 
     logger.info(f"✅ Reconstructed {len(time_maps)} time-indexed maps")
     return time_maps
@@ -285,6 +295,7 @@ def run_inference_pipeline(
         "spatial_training.glofas_path", "data/maps/flood_return_period/glofas_10_year_rp.tif"
     )
     model = load_trained_model(model_path)
+    forecast_horizon = resolve_forecast_horizon_periods()
 
     X, indices = generate_deployment_sequences_in_memory(
         inundation_file_path,
@@ -292,10 +303,16 @@ def run_inference_pipeline(
         moisture_file_path,
         ecmwf_file_path,
         glofas_file_path,
-        static_dir=static_dir
+        static_dir=static_dir,
+        forecast_horizon=forecast_horizon,
     )
 
     y_pred = predict_with_model(model, X)
+    if y_pred.ndim != 5 or y_pred.shape[1] != forecast_horizon:
+        raise ValueError(
+            f"Spatial model must output {forecast_horizon} future maps; got {y_pred.shape}. "
+            "Retrain it with python3 -m model.spatial.train_convlstm."
+        )
     maps = reconstruct_maps(y_pred, indices, full_shape, border=border)
     return maps
 
@@ -993,7 +1010,11 @@ def run_full_spatial_analysis():
     pred_df, folder_title = load_latest_prediction_csv()
 
     # Determine example time index
-    assert sorted(maps.keys())[-1] + 13 == len(pred_df), f"Mismatch in prediction timeline with historic data = {sorted(maps.keys())[-1] + 13} and prediction data = {len(pred_df)}"
+    expected_horizon = resolve_forecast_horizon_periods()
+    if sorted(maps) != list(range(1, expected_horizon + 1)):
+        raise RuntimeError(
+            f"Expected spatial leads 1..{expected_horizon}, received {sorted(maps)}."
+        )
     example_t = sorted(maps.keys())[-1]
 
     # Extract flood thresholds

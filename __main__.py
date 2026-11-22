@@ -16,7 +16,7 @@ import pandas as pd
 
 from data.stats import gridded_stats
 from model.ablation.area_reconversion import convert_target_fraction_to_km2, target_area_conversion_metadata
-from model.ablation.deployment import (
+from model.ablation.temporal_deployment import (
     generate_temporal_forecast,
     load_best_model_row,
     retrain_best_model_on_available_data,

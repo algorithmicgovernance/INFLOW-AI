@@ -24,20 +24,41 @@ CHANNEL_NAMES = (
 )
 
 
-def load_glofas_grid(path, height: int, width: int) -> np.ndarray:
-    """Load the configured GloFAS return-period raster on the target grid."""
+def load_raster_on_target_grid(path, height: int, width: int) -> np.ndarray:
+    """Read or reproject a raster onto the configured target reference grid."""
+    destination = np.zeros((height, width), dtype=np.float32)
+    target_transform = rasterio.Affine(*cleaning_utils.MASK_REGIONS_REF_TRANSFORM)
     with rasterio.open(path) as source:
-        data = source.read(1, out_shape=(height, width), resampling=Resampling.bilinear)
         expected_crs = str(cleaning_utils.MASK_REGIONS_REF_CRS)
-        if source.shape != (height, width) or str(source.crs) != expected_crs:
-            raise ValueError(
-                f"GloFAS raster must use the target grid {(height, width)} / {expected_crs}: {path}"
+        expected_transform = tuple(target_transform)[:6]
+        if (
+            source.shape == (height, width)
+            and str(source.crs) == expected_crs
+            and np.allclose(tuple(source.transform)[:6], expected_transform)
+        ):
+            destination[:] = source.read(1)
+        else:
+            reproject(
+                source=rasterio.band(source, 1),
+                destination=destination,
+                src_transform=source.transform,
+                src_crs=source.crs,
+                src_nodata=source.nodata,
+                dst_transform=target_transform,
+                dst_crs=cleaning_utils.MASK_REGIONS_REF_CRS,
+                dst_nodata=0.0,
+                resampling=Resampling.bilinear,
             )
-    data = np.asarray(data, dtype=np.float32)
+    data = destination
     # The supplied raster encodes cells outside the river network as -9999
     # without declaring a GDAL nodata value.
     data[data <= -9990.0] = 0.0
     return np.nan_to_num(data)
+
+
+def load_glofas_grid(path, height: int, width: int) -> np.ndarray:
+    """Load a configured GloFAS raster on the target grid."""
+    return load_raster_on_target_grid(path, height, width)
 
 
 def ecmwf_patch(

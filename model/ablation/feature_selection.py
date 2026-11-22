@@ -140,7 +140,7 @@ def _cv_mean_mae_for_k(
     en_max_iter: int,
     mandatory_indices: np.ndarray | None = None,
 ) -> float:
-    from .models import MODEL_REGISTRY
+    from .models import TEMPORAL_MODEL_REGISTRY
 
     tscv = TimeSeriesSplit(n_splits=cv_splits)
     fold_losses: list[float] = []
@@ -163,7 +163,7 @@ def _cv_mean_mae_for_k(
         if mandatory_indices is not None and len(mandatory_indices):
             selected = np.array(sorted(set(selected.tolist()) | set(mandatory_indices.tolist())), dtype=int)
 
-        model = MODEL_REGISTRY[model_type](seed=seed)
+        model = TEMPORAL_MODEL_REGISTRY[model_type](seed=seed)
         model.fit(X_fold_train[:, selected], y_fold_train)
         y_pred_val = model.predict(X_fold_val[:, selected])
         fold_losses.append(float(mean_absolute_error(y_fold_val, y_pred_val)))

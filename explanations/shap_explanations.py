@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import shap
 
-from model.ablation.deployment import (
+from model.ablation.temporal_deployment import (
     _add_optional_feature_blocks,
     _add_post_scale_cumulative_features,
     _apply_saved_feature_transforms,
@@ -18,7 +18,7 @@ from model.ablation.deployment import (
     _restore_model_wrapper,
     _sync_runtime_config_from_row,
 )
-from model.ablation.data_pipeline import _build_temporal_feature_table, _target_transform
+from model.ablation.temporal_data_pipeline import _build_temporal_feature_table, _target_transform
 from model.ablation.area_reconversion import target_area_scale_km2
 from explanations.variable_names import human_readable_variable_name
 

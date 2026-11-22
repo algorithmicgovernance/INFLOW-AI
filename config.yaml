@@ -80,6 +80,11 @@ runtime:
   teleconnections:
     min_date: "2002-07-01"
 
+# Shared by temporal forecasts and spatial ConvLSTM outputs.
+forecast:
+  horizon_periods: 6
+  horizon_months: 2
+
 spatial_training:
   model_path: "model/spatial_model.keras"
   elevation_path: "data/maps/elevation.npy"
@@ -89,23 +94,32 @@ spatial_training:
   patch_size: 64
   stride: 32
   patches_per_timestep: 16
-  batch_size: 4
-  hdf5_cache_mb: 64
-  mixed_precision: false
+  batch_size: 8
+  hdf5_cache_mb: 128
+  backup_dir: ""
+  backup_frequency_batches: 500
+  mixed_precision: true
   filters: [32]
-  epochs: 20
+  max_epochs: 200
   validation_fraction: 0.2
-  early_stopping_patience: 5
+  early_stopping_patience: 10
+  early_stopping_min_delta: 1.0e-5
   seed: 42
 
+spatial_validation:
+  enabled: true
+  inundation_threshold: 0.5
+  glofas_20_year_path: "data/maps/glofas/merged_raster_SSD_20_20260604164952.tif"
+  glofas_100_year_path: "data/maps/glofas/merged_raster_SSD_100_20260604172751.tif"
+
+# Temporal-model ablation and deployment configuration. The key remains stable
+# so existing experiment metadata and artifact paths remain compatible.
 ablation:
   enabled: true
   pipeline:
     target_column: "percent_inundation_ssd"
     imputation_warning_threshold: 0.10
     drop_metadata_columns: true
-    forecast_horizon_periods: "auto_two_months"
-    forecast_horizon_months: 2
     metrics:
       extreme_event_top_fraction: 0.10
     feature_selection:
