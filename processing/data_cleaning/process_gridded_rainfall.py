@@ -1,6 +1,8 @@
 # Import system libraries
 import os
 import glob
+import tempfile
+from pathlib import Path
 
 # Import cleaning utils
 from .. import cleaning_utils
@@ -34,6 +36,11 @@ import h5py
 
 # Import progress bar libraries
 from tqdm import tqdm
+from .gridded_streaming import (
+    PeriodFiles, build_grid_masks, complete_periods, inventory_daily_files,
+    quarantine_invalid_files, resolve_project_path, stream_period_grid,
+    sync_product, validate_daily_files,
+)
 
 # Configure logging
 import logging
@@ -157,6 +164,22 @@ def _validate_rainfall_netcdf_file(netcdf_path):
 
 def _get_latest_valid_rainfall_netcdf(extract_folder):
     """Return the most recent readable rainfall NetCDF from extract folder."""
+    return _get_valid_rainfall_netcdf(extract_folder)
+
+
+def _rainfall_netcdf_date_range(netcdf_path):
+    with nc.Dataset(netcdf_path, mode="r") as ds:
+        time_var = ds.variables["time"]
+        dates = nc.num2date(
+            time_var[:], units=time_var.units,
+            calendar=getattr(time_var, "calendar", "standard"),
+            only_use_cftime_datetimes=False, only_use_python_datetimes=False,
+        )
+    return pd.Timestamp(dates[0]).normalize(), pd.Timestamp(dates[-1]).normalize()
+
+
+def _get_valid_rainfall_netcdf(extract_folder, required_start=None, required_end=None):
+    """Return a readable rainfall NetCDF covering the requested local archive."""
     list_of_files = sorted(
         glob.glob(os.path.join(os.getcwd(), extract_folder, '*.nc')),
         key=os.path.getctime,
@@ -169,6 +192,15 @@ def _get_latest_valid_rainfall_netcdf(extract_folder):
     for path in list_of_files:
         try:
             _validate_rainfall_netcdf_file(path)
+            file_start, file_end = _rainfall_netcdf_date_range(path)
+            if required_start is not None and file_start > pd.Timestamp(required_start):
+                raise RuntimeError(
+                    f"coverage starts at {file_start.date()}, after required {pd.Timestamp(required_start).date()}"
+                )
+            if required_end is not None and file_end < pd.Timestamp(required_end):
+                raise RuntimeError(
+                    f"coverage ends at {file_end.date()}, before required {pd.Timestamp(required_end).date()}"
+                )
             return path
         except Exception as e:
             errors.append(f"{os.path.basename(path)}: {e}")
@@ -231,18 +263,19 @@ def download_new_gridded_rainfall(download_folder, target_product=None):
     if missing_dates:
         download_range = [missing_dates[0], missing_dates[-1]]
         download_gridded_rainfall(download_range, download_path_full)
-        extract_gridded_rainfall(download_range, download_folder)
-        # Fail-fast if extraction produced an unreadable or incomplete file.
-        _get_latest_valid_rainfall_netcdf(EXTRACTED_DOMAIN_PATH)
-    else:
-        try:
-            _get_latest_valid_rainfall_netcdf(EXTRACTED_DOMAIN_PATH)
-        except RuntimeError:
-            if local_dates:
-                extract_gridded_rainfall([min(local_dates), max(local_dates)], download_folder)
-                _get_latest_valid_rainfall_netcdf(EXTRACTED_DOMAIN_PATH)
-            else:
-                raise
+        local_dates = cleaning_utils.get_local_download_dates(local_product_path)
+
+    if not local_dates:
+        raise RuntimeError(f"No downloaded daily rainfall files found in {local_product_path}")
+    required_start, required_end = min(local_dates), max(local_dates)
+    try:
+        _get_valid_rainfall_netcdf(EXTRACTED_DOMAIN_PATH, required_start, required_end)
+    except RuntimeError:
+        # As in the moisture pipeline, extraction always spans the complete
+        # cached archive so a clean rebuild cannot accidentally use only the
+        # latest incremental download.
+        extract_gridded_rainfall([required_start, required_end], download_folder)
+        _get_valid_rainfall_netcdf(EXTRACTED_DOMAIN_PATH, required_start, required_end)
 
 
 def group_dates_by_decade(dates, target_product='modis'):
@@ -280,7 +313,12 @@ def export_decadal_geotiffs(extract_folder, output_folder, target_product='modis
             print(f"Error deleting {file}: {e}")
             
     # Select and validate latest extracted gridded rainfall file.
-    latest_file = _get_latest_valid_rainfall_netcdf(extract_folder)
+    local_dates = cleaning_utils.get_local_download_dates(
+        os.path.join(os.getcwd(), GR_RAINFALL_DOWNLOAD_PATH)
+    )
+    required_start = min(local_dates) if local_dates else None
+    required_end = max(local_dates) if local_dates else None
+    latest_file = _get_valid_rainfall_netcdf(extract_folder, required_start, required_end)
 
     # Stream from NetCDF in small slices so the full time cube is never loaded.
     with nc.Dataset(latest_file, mode='r') as rainfall_grid:
@@ -289,8 +327,13 @@ def export_decadal_geotiffs(extract_folder, output_folder, target_product='modis
         times = rainfall_grid.variables['time'][:]
         rainfall_var = rainfall_grid.variables['rfe']
 
-        first_date = datetime.strptime(latest_file[-24:-14], '%Y-%m-%d')
-        dates = [(first_date + timedelta(days=int(i))) for i in times]
+        time_var = rainfall_grid.variables['time']
+        decoded = nc.num2date(
+            times, units=time_var.units,
+            calendar=getattr(time_var, 'calendar', 'standard'),
+            only_use_cftime_datetimes=False, only_use_python_datetimes=False,
+        )
+        dates = [pd.Timestamp(value).to_pydatetime() for value in decoded]
 
         print('--- Gridded rainfall data loaded ---')
 
@@ -300,9 +343,9 @@ def export_decadal_geotiffs(extract_folder, output_folder, target_product='modis
         # Define transform once using the latitude and longitude arrays.
         lon_min = lons.min()
         lat_max = lats.max()
-        pixel_size_x = lons[1] - lons[0]
-        pixel_size_y = lats[1] - lats[0]
-        transform = from_origin(lon_min, lat_max, pixel_size_x, -pixel_size_y)
+        pixel_size_x = abs(lons[1] - lons[0])
+        pixel_size_y = abs(lats[1] - lats[0])
+        transform = from_origin(lon_min, lat_max, pixel_size_x, pixel_size_y)
 
         # Export each target-period group as a GeoTIFF.
         for group, indices in tqdm(zip(date_groups, grouped_indices), total=len(date_groups), desc="Exporting decadal averages"):
@@ -337,49 +380,25 @@ def export_decadal_geotiffs(extract_folder, output_folder, target_product='modis
             ) as dst:
                 dst.write(decadal_avg, 1)
 
-            period_label = 'VIIRS half-month' if target_product == 'viirs' else 'MODIS dekad'
+            period_label = f'{target_product.upper()} dekad'
             print(f'Exported {period_label} GeoTIFF for {first_dekad_str}')
         
 
 def crop_historic_data(file_path, temporal_data_path):
-    """
-    Crop or recreate the historic inundation HDF5 dataset to match the temporal CSV length.
+    """Validate legacy outputs without deleting either side.
 
-    If the HDF5 dataset is longer than the CSV, the entire HDF5 file will be truncated and recreated.
+    Kept for compatibility with older callers. New code synchronizes by the
+    explicit HDF5 ``dates`` dataset and recreates the CSV from HDF5 if needed.
     """
-
-    # --- Load temporal data length only ---
     hist = pd.read_csv(temporal_data_path)
-    new_len = len(hist)
-
-    # --- Open HDF5 and check dataset length ---
-    with h5py.File(file_path, "r+") as f:
-        dset_name = list(f.keys())[0]
-        dset = f[dset_name]
-        current_len = dset.shape[0]
-
-        if current_len < new_len:
-            hist.iloc[:current_len].to_csv(temporal_data_path, index=False)
-
-        elif current_len > new_len:
-            print(f"Cropping from {current_len} → {new_len} timesteps...")
-
-            # 🔥 NEW: overwrite file entirely if HDF5 is longer than CSV
-            f.close()  # Close open handle
-            os.remove(file_path)  # Truncate file (delete completely)
-
-            # Recreate the HDF5 file with the cropped data
-            with h5py.File(file_path, "w") as newf:
-                newf.create_dataset(
-                    dset_name,
-                    data=dset[:new_len],
-                    maxshape=(None, *dset.shape[1:]),
-                    chunks=True,
-                    dtype=dset.dtype,
-                )
-            print("✅ File truncated and recreated with cropped data.")
-        else:
-            print("✅ No cropping needed. Temporal lengths already match.")
+    with h5py.File(file_path, "r") as hdf:
+        if "rainfall" not in hdf:
+            raise ValueError(f"Missing rainfall dataset in {file_path}")
+        if hdf["rainfall"].shape[0] != len(hist):
+            raise ValueError(
+                "Rainfall HDF5 and temporal CSV lengths differ; use "
+                "update_gridded_rainfall() to repair them safely."
+            )
 
 
 def process_new_gridded_rainfall(rainfall_dekads_folder,
@@ -442,12 +461,145 @@ def process_single_rainfall_tif(rainfall_tif_path, catchments):
     return resampled_rainfall.astype(np.float32, copy=False)
 
 
+def _date_strings_from_hdf(hdf):
+    if "dates" not in hdf:
+        return []
+    return list(hdf["dates"].asstr()[:])
+
+
+def _migrate_legacy_hdf_dates(hdf_path, temporal_path):
+    """Add dates to a legacy HDF5 only when its CSV is an exact-length match."""
+    if not os.path.exists(hdf_path) or not os.path.exists(temporal_path):
+        return False
+    frame = pd.read_csv(temporal_path)
+    if "date" not in frame:
+        return False
+    dates = pd.to_datetime(frame["date"], errors="coerce")
+    if dates.isna().any() or dates.duplicated().any() or not dates.is_monotonic_increasing:
+        return False
+    with h5py.File(hdf_path, "r+") as hdf:
+        if "rainfall" not in hdf or hdf["rainfall"].shape[0] != len(dates):
+            return False
+        if "dates" not in hdf:
+            hdf.create_dataset(
+                "dates", data=np.asarray(dates.dt.strftime("%Y-%m-%d"), dtype=object),
+                maxshape=(None,), dtype=h5py.string_dtype("utf-8"),
+            )
+        hdf.attrs["target_product"] = cleaning_utils.resolve_target_product(None)
+    return True
+
+
+def _rainfall_temporal_row(date_str, rainfall_2d, regions_gdf):
+    total_cells = rainfall_2d.shape[0] * rainfall_2d.shape[1]
+    row = {"date": date_str, "rainfall": float(np.nansum(rainfall_2d))}
+    rainfall_3d = rainfall_2d[np.newaxis, :, :]
+    for i in range(len(regions_gdf)):
+        region_data = regions_gdf.iloc[[i]]
+        region_code = gridded_stats.region_to_code_dict[region_data["region"].values[0]]
+        region_area = cleaning_utils.mask_regions(region_data, rainfall_3d)
+        valid_cells = total_cells - np.sum(np.isnan(region_area[0]))
+        row[f"rainfall_{region_code}"] = (
+            float(np.nansum(region_area)) / valid_cells if valid_cells > 0 else np.nan
+        )
+    return row
+
+
+def _append_rainfall_periods(hdf_path, pending, catchments, regions_gdf, target_product):
+    """Append complete, chronologically ordered periods and return CSV rows."""
+    rows = []
+    Path(hdf_path).parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(hdf_path, "a") as hdf:
+        rainfall_dset = hdf.get("rainfall")
+        dates_dset = hdf.get("dates")
+        for tif_path, date_str in tqdm(pending, desc="Streaming rainfall into H5"):
+            rainfall_2d = process_single_rainfall_tif(tif_path, catchments)
+            if rainfall_dset is None:
+                rainfall_dset = hdf.create_dataset(
+                    "rainfall", shape=(0, *rainfall_2d.shape),
+                    maxshape=(None, *rainfall_2d.shape),
+                    chunks=(1, *rainfall_2d.shape), dtype=np.float32,
+                    compression="gzip", compression_opts=4, shuffle=True,
+                )
+            if dates_dset is None:
+                dates_dset = hdf.create_dataset(
+                    "dates", shape=(0,), maxshape=(None,),
+                    dtype=h5py.string_dtype("utf-8"),
+                )
+            if tuple(rainfall_dset.shape[1:]) != tuple(rainfall_2d.shape):
+                raise ValueError(
+                    f"Rainfall grid changed from {rainfall_dset.shape[1:]} to {rainfall_2d.shape}"
+                )
+            index = rainfall_dset.shape[0]
+            rainfall_dset.resize(index + 1, axis=0)
+            dates_dset.resize(index + 1, axis=0)
+            rainfall_dset[index] = rainfall_2d
+            dates_dset[index] = date_str
+            rows.append(_rainfall_temporal_row(date_str, rainfall_2d, regions_gdf))
+        hdf.attrs["target_product"] = target_product
+        hdf.attrs["units"] = "mm"
+        hdf.attrs["aggregation"] = "mean daily rainfall within complete target period"
+        hdf.flush()
+    return rows
+
+
+def _write_csv_atomic(frame, temporal_path):
+    path = Path(temporal_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    os.close(handle)
+    try:
+        frame.to_csv(temporary, index=False)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def _temporal_csv_from_hdf(hdf_path, temporal_path, regions_gdf):
+    """Recreate temporal statistics from the authoritative HDF5 dates/grids."""
+    rows = []
+    with h5py.File(hdf_path, "r") as hdf:
+        dates = _date_strings_from_hdf(hdf)
+        if "rainfall" not in hdf or len(dates) != hdf["rainfall"].shape[0]:
+            raise ValueError("Rainfall HDF5 has missing or inconsistent dates")
+        for index, date_str in enumerate(tqdm(dates, desc="Rebuilding rainfall temporal CSV")):
+            rows.append(_rainfall_temporal_row(date_str, hdf["rainfall"][index], regions_gdf))
+    frame = pd.DataFrame(rows)
+    _write_csv_atomic(frame, temporal_path)
+    return frame
+
+
+def _validate_rainfall_outputs(hdf_path, temporal_path, expected_dates=None):
+    frame = pd.read_csv(temporal_path)
+    if "date" not in frame or frame.empty:
+        raise ValueError("Rainfall temporal CSV is empty or missing date")
+    csv_dates = pd.to_datetime(frame["date"], errors="coerce")
+    if csv_dates.isna().any() or csv_dates.duplicated().any() or not csv_dates.is_monotonic_increasing:
+        raise ValueError("Rainfall temporal CSV dates must be valid, unique, and sorted")
+    rainfall_columns = [column for column in frame if column.startswith("rainfall")]
+    if not rainfall_columns or frame[rainfall_columns].isna().all().any():
+        raise ValueError("Rainfall temporal CSV contains an entirely empty rainfall feature")
+    with h5py.File(hdf_path, "r") as hdf:
+        if "rainfall" not in hdf or "dates" not in hdf:
+            raise ValueError("Rainfall HDF5 must contain rainfall and dates datasets")
+        hdf_dates = _date_strings_from_hdf(hdf)
+        if hdf["rainfall"].shape[0] != len(hdf_dates):
+            raise ValueError("Rainfall HDF5 grid/date lengths differ")
+    csv_strings = list(csv_dates.dt.strftime("%Y-%m-%d"))
+    if hdf_dates != csv_strings:
+        raise ValueError("Rainfall HDF5 and temporal CSV dates differ")
+    if expected_dates is not None and hdf_dates != list(expected_dates):
+        raise ValueError("Rainfall outputs do not contain the expected complete target periods")
+    return hdf_dates
+
+
 def update_gridded_rainfall(
     download_folder=DOWNLOADS_ROOT,
     download_path=GR_RAINFALL_DOWNLOAD_PATH,
     extract_folder=EXTRACTED_DOMAIN_PATH,
     dekads_path=GR_RAINFALL_DEKADS_PATH,
-    temporal_data_path=GR_RAINFALL_TEMPORAL_PATH):
+    temporal_data_path=GR_RAINFALL_TEMPORAL_PATH,
+    rebuild=False):
     """
     Combine newly downloaded gridded rainfall with existing data.
 
@@ -460,104 +612,78 @@ def update_gridded_rainfall(
     """
     try:
         target_product = cleaning_utils.resolve_target_product(None)
-
-        # Crop historic data if historic spatial and temporal data are not the same size   
-        if os.path.exists(GR_RAINFALL_H5_PATH) and os.path.exists(temporal_data_path):
-            crop_historic_data(
-                file_path=GR_RAINFALL_H5_PATH,
-                temporal_data_path=temporal_data_path,
+        daily_root = resolve_project_path(download_path)
+        local = inventory_daily_files(daily_root)
+        start = cleaning_utils.get_target_start_date(target_product)
+        today = pd.Timestamp.today().normalize()
+        if not local:
+            download_gridded_rainfall(
+                [start, today.strftime("%Y-%m-%d")], str(resolve_project_path(download_folder))
             )
-        
-        # Update rainfall data
-        download_new_gridded_rainfall(download_folder, target_product=target_product)
-        
-        # Process new files
-        dekads_path_full = os.path.join(os.getcwd(), dekads_path)
-        export_decadal_geotiffs(extract_folder, dekads_path_full, target_product=target_product)
-        aligned_files, dates = process_new_gridded_rainfall(dekads_path_full)
-        historic_dates = get_historic_dates()
-
-        # Identify new files
-        pending = []
-        for i in range(len(dates)):
-            date_str = dates[i].strftime("%Y-%m-%d")
-            tif_name = aligned_files[i]
-            if date_str in historic_dates:
-                continue
-            if pd.isna(tif_name):
-                logging.warning(f"Skipping missing rainfall file for date {date_str}")
-                continue
-            pending.append((os.path.join(dekads_path_full, tif_name), date_str))
-
-        if len(pending) == 0:
-            logging.info("No new files to process.")
-
         else:
-            # Prepare region masks and output state.
-            regions_gdf = cleaning_utils.extract_regions()
-            catchments = gpd.read_file(CATCHMENTS_PATH)
-
-            if os.path.exists(GR_RAINFALL_H5_PATH):
-                hdf_mode = 'a'
-            else:
-                hdf_mode = 'w'
-
-            temporal_rows = []
-            with h5py.File(GR_RAINFALL_H5_PATH, hdf_mode) as hdf:
-                dset = hdf.get('rainfall')
-
-                for tif_path, date_str in tqdm(pending, desc="Streaming rainfall into H5"):
-                    try:
-                        rainfall_2d = process_single_rainfall_tif(tif_path, catchments)
-                    except Exception as e:
-                        raise RuntimeError(f"Failed processing rainfall tif '{tif_path}': {e}") from e
-
-                    if dset is None:
-                        dset = hdf.create_dataset(
-                            'rainfall',
-                            shape=(0, rainfall_2d.shape[0], rainfall_2d.shape[1]),
-                            maxshape=(None, rainfall_2d.shape[0], rainfall_2d.shape[1]),
-                            chunks=(1, rainfall_2d.shape[0], rainfall_2d.shape[1]),
-                            dtype=np.float32,
-                        )
-
-                    current_len = dset.shape[0]
-                    dset.resize(current_len + 1, axis=0)
-                    dset[current_len] = rainfall_2d
-
-                    total_cells = rainfall_2d.shape[0] * rainfall_2d.shape[1]
-                    row = {
-                        'date': date_str,
-                        'rainfall': float(np.nansum(rainfall_2d)),
-                    }
-                    rainfall_3d = rainfall_2d[np.newaxis, :, :]
-                    for i in range(len(regions_gdf)):
-                        region_data = regions_gdf.iloc[[i]]
-                        region_code = gridded_stats.region_to_code_dict[region_data['region'].values[0]]
-                        region_area = cleaning_utils.mask_regions(region_data, rainfall_3d)
-                        valid_cells = total_cells - np.sum(np.isnan(region_area[0]))
-                        row[f"rainfall_{region_code}"] = (
-                            float(np.nansum(region_area)) / valid_cells if valid_cells > 0 else np.nan
-                        )
-
-                    temporal_rows.append(row)
-
-                logging.info(f"Updated rainfall dataset shape: {dset.shape}")
-
-            # Update temporal data
-            rainfall_temporal = pd.DataFrame(temporal_rows)
-            if os.path.exists(temporal_data_path):
-                rainfall_temporal_historic = pd.read_csv(temporal_data_path)
-            else:
-                rainfall_temporal_historic = pd.DataFrame(columns=rainfall_temporal.columns)
-            rainfall_temporal_new = pd.concat([rainfall_temporal_historic, rainfall_temporal], ignore_index=True)
-
-            # Save the updated temporal data
-            rainfall_temporal_new['date'] = pd.to_datetime(rainfall_temporal_new['date'], errors='coerce')
-            rainfall_temporal_new = rainfall_temporal_new.dropna(subset=['date'])
-            rainfall_temporal_new = rainfall_temporal_new.sort_values('date').drop_duplicates(subset=['date'], keep='last').reset_index(drop=True)
-            rainfall_temporal_new.to_csv(temporal_data_path, index=False)
+            last = max(local)
+            if last < today:
+                download_gridded_rainfall(
+                    [(last + pd.Timedelta(days=1)).strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")],
+                    str(resolve_project_path(download_folder)),
+                )
+        local = inventory_daily_files(daily_root)
+        periods = complete_periods(local)
+        invalid = validate_daily_files(periods, "rfe")
+        if invalid:
+            invalid_paths = {path for path, _ in invalid}
+            invalid_dates = sorted(date for date, path in local.items() if path in invalid_paths)
+            for path, reason in invalid:
+                logging.error("Unreadable rainfall source %s: %s", path, reason)
+            quarantine_invalid_files(invalid)
+            if invalid_dates:
+                download_gridded_rainfall(
+                    [invalid_dates[0].strftime("%Y-%m-%d"), invalid_dates[-1].strftime("%Y-%m-%d")],
+                    str(resolve_project_path(download_folder)),
+                )
+            local = inventory_daily_files(daily_root)
+            missing_replacements = [date for date in invalid_dates if date not in local]
+            if missing_replacements:
+                raise RuntimeError(
+                    "Unable to replace unreadable rainfall dates: "
+                    + ", ".join(date.strftime("%Y-%m-%d") for date in missing_replacements)
+                )
+            replacement_errors = validate_daily_files(
+                [PeriodFiles(date.strftime("%Y-%m-%d"), (local[date],)) for date in invalid_dates],
+                "rfe",
+            )
+            if replacement_errors:
+                raise RuntimeError(f"Replacement rainfall files are unreadable: {replacement_errors[:10]}")
+            periods = complete_periods(local)
+            remaining = validate_daily_files(periods, "rfe")
+            if remaining:
+                raise RuntimeError(f"Unreadable rainfall files remain after download attempt: {remaining[:10]}")
+        masks = build_grid_masks(CATCHMENTS_PATH)
+        status, count = sync_product(
+            periods=periods,
+            hdf_path=resolve_project_path(GR_RAINFALL_H5_PATH),
+            csv_path=resolve_project_path(temporal_data_path),
+            dataset_name="rainfall",
+            prefix="rainfall",
+            target_product=target_product,
+            masks=masks,
+            loader=lambda period: stream_period_grid(period.files, "rfe", masks),
+            rebuild=rebuild,
+        )
+        logging.info("Rainfall outputs %s (%d periods written).", status, count)
 
     except Exception as e:
         logging.error(f"Error processing rainfall data: {e}")
         raise
+
+
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Build or update target-aligned gridded rainfall data.")
+    parser.add_argument("--rebuild", action="store_true", help="Recreate HDF5 and CSV from downloaded rainfall")
+    args = parser.parse_args()
+    update_gridded_rainfall(rebuild=args.rebuild)
+
+
+if __name__ == "__main__":
+    main()

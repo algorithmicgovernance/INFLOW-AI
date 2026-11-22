@@ -1,0 +1,62 @@
+{
+  "best_k": 16,
+  "configuration_signature": {
+    "autoregressive": false,
+    "feature_block_name": "no_feature_lags",
+    "include_ecmwf_hindcasts": true,
+    "include_feature_lag_features": false,
+    "include_target_lag_features": true,
+    "inundation_product": "viirs",
+    "lead_period": 4,
+    "target_type": "raw",
+    "training_cutoff_date": "2025-07-21"
+  },
+  "cv_mean_mae_by_k": {
+    "128": 0.03646506369113922,
+    "16": 0.029083753004670143,
+    "32": 0.03646662893394629,
+    "8": 0.031014684587717056
+  },
+  "dataset_fingerprint": "94be4c7c4b24c0abb017cac5fcc8916c2cf9e1dd8c99742a918b9d86d9ca9841",
+  "removed_constant_features": [],
+  "removed_correlated_features": [
+    "ecmwf_rainfall_lak_lead_3",
+    "ecmwf_rainfall_lak_lead_4",
+    "moisture_ssd",
+    "cumulative_rainfall_ssd",
+    "cumulative_rainfall_ceq",
+    "cumulative_rainfall_eeq",
+    "cumulative_rainfall_jon",
+    "cumulative_rainfall_lak",
+    "cumulative_rainfall_nbg",
+    "cumulative_rainfall_uni",
+    "cumulative_rainfall_upn",
+    "cumulative_rainfall_war",
+    "cumulative_rainfall_wbg",
+    "cumulative_rainfall_weq",
+    "cumulative_rainfall_aby",
+    "rainfall_ssd",
+    "year",
+    "soi_sd",
+    "day_of_year"
+  ],
+  "selected_feature_names": [
+    "albert_water_level",
+    "ecmwf_has_forecast",
+    "ecmwf_rainfall_aby_lead_1",
+    "ecmwf_rainfall_eeq_lead_3",
+    "moisture_eeq",
+    "cumulative_rainfall",
+    "ninoANOM",
+    "ninoNINO4",
+    "mjo20E",
+    "wtio",
+    "CHIRPS_cumulative_scaled",
+    "TAMSAT_cumulative_scaled",
+    "rainfall_ceq_cumulative_scaled",
+    "rainfall_nbg_cumulative_scaled",
+    "rainfall_war_cumulative_scaled",
+    "rainfall_wbg_cumulative_scaled"
+  ],
+  "selection_model_type": "elastic_net"
+}

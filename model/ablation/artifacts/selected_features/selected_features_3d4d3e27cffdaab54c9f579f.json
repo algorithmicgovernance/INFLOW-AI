@@ -1,0 +1,54 @@
+{
+  "best_k": 8,
+  "configuration_signature": {
+    "autoregressive": false,
+    "feature_block_name": "no_feature_lags",
+    "include_ecmwf_hindcasts": true,
+    "include_feature_lag_features": false,
+    "include_target_lag_features": true,
+    "inundation_product": "viirs",
+    "lead_period": 6,
+    "target_type": "first_differenced",
+    "training_cutoff_date": "2025-07-21"
+  },
+  "cv_mean_mae_by_k": {
+    "128": 0.0028644116828218102,
+    "16": 0.0028644034949441752,
+    "32": 0.0028644034173339605,
+    "8": 0.0026404530508443713
+  },
+  "dataset_fingerprint": "fdce5613c5f909e37b1254cd8cda4532c9a88da5c3de1d428e6ab042a738e307",
+  "removed_constant_features": [],
+  "removed_correlated_features": [
+    "ecmwf_rainfall_lak_lead_3",
+    "ecmwf_rainfall_lak_lead_4",
+    "moisture_ssd",
+    "cumulative_rainfall_ssd",
+    "cumulative_rainfall_ceq",
+    "cumulative_rainfall_eeq",
+    "cumulative_rainfall_jon",
+    "cumulative_rainfall_lak",
+    "cumulative_rainfall_nbg",
+    "cumulative_rainfall_uni",
+    "cumulative_rainfall_upn",
+    "cumulative_rainfall_war",
+    "cumulative_rainfall_wbg",
+    "cumulative_rainfall_weq",
+    "cumulative_rainfall_aby",
+    "rainfall_ssd",
+    "year",
+    "soi_sd",
+    "day_of_year"
+  ],
+  "selected_feature_names": [
+    "ecmwf_rainfall_aby_lead_4",
+    "rainfall_wbg",
+    "ninoNINO4",
+    "cos_doy",
+    "TAMSAT_cumulative_scaled",
+    "TAMSAT_cumulative_cumulative_scaled",
+    "rainfall_eeq_cumulative_scaled",
+    "rainfall_jon_cumulative_scaled"
+  ],
+  "selection_model_type": "elastic_net"
+}

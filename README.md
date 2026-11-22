@@ -21,17 +21,45 @@ python3 -m pip install -r requirements.txt
 ## First Run
 
 1. Review [config.yaml](config.yaml), especially `runtime.target_product`.
-2. Run the ablation experiments:
+2. Download and process the datasets required for ablation testing. This uses
+   `runtime.target_product` from `config.yaml` and does not require an existing
+   trained model:
+
+```bash
+python3 -m model.ablation.prepare_data
+```
+
+3. Run the ablation experiments:
 
 ```bash
 python3 -m model.ablation.run_ablation
 ```
 
-3. Run the prediction pipeline:
+4. Run the prediction pipeline:
 
 ```bash
 python3 __main__.py
 ```
+
+To retrain the ConvLSTM spatial model from the processed HDF5 grids, run:
+
+```bash
+python3 -m model.spatial.train_convlstm
+```
+
+Spatial training uses a chronological 80/20 split and streams 64-pixel patches
+from the configured target-product inundation, rainfall, and moisture HDF5
+files. It samples the configured number of spatial patches per timestep to keep
+epochs tractable. The resulting model is saved to `model/spatial_model.keras`, which is
+the model loaded by the spatial prediction pipeline. Training requires a
+TensorFlow-compatible Python version (currently Python 3.12 or earlier).
+The model channels also include all four ECMWF 10-day rainfall windows and the
+aligned static GloFAS 10-year return-period raster. When `runtime.target_product`
+is `viirs`, VIIRS inundation is used as the prediction target.
+Spatial samples remain grouped by timestep so HDF5 chunks are decompressed once
+and reused across patches. `spatial_training.hdf5_cache_mb`, `batch_size`,
+`patches_per_timestep`, and optional GPU `mixed_precision` can be tuned for the
+available hardware.
 
 The first data run takes substantially longer. It downloads and builds the historic record for the spatial and temporal datasets, including HDF5 files and aligned temporal CSVs. Later runs update only the available period.
 
@@ -74,6 +102,20 @@ The `ablation.experiments` section controls the experiment grid:
 - `seed`
 - `log_path`
 
+With `ablation.staged.enabled`, the experiment runs in two stages. Stage one
+varies model, autoregression, and target transformation while holding the
+configured preprocessing blocks fixed. The configurations with the highest
+configured ranking metric advance to stage two, which evaluates the ECMWF,
+target-lag, and historical-feature-lag removals listed under
+`ablation.staged.feature_block_ablations`. The stage and block name are stored
+in every experiment-log row.
+
+Feature selection is shared across candidate models. The configured
+`feature_selection.selection_model_type` computes and caches one selection for
+each dataset, lead, target setup, and feature-block combination. Thus all model
+architectures are compared on the same lead-specific inputs without repeating
+feature-selection cross-validation.
+
 The `ablation.pipeline` section controls shared model preparation:
 
 - `target_column`
@@ -83,6 +125,17 @@ The `ablation.pipeline` section controls shared model preparation:
 - lag steps such as `[1, 2, 3, 6, 12]`
 - feature selection thresholds and candidate feature counts
 - optional PCA
+
+The `transformer` model is a joint, non-autoregressive multi-horizon ablation
+model. Its encoder receives the configured sequence of historical observations;
+its decoder receives four ECMWF tokens for days 1–10, 11–20, 21–30, and 31–40.
+Decoder self-attention and encoder-decoder cross-attention feed a head that
+predicts every configured target horizon in one pass. Its architecture and
+training settings are under `ablation.pipeline.transformer`.
+
+Transformer experiments are recorded and compared in the ablation log. They
+are not promoted to `best_temporal_model.json` yet because the operational
+retraining and forecast path currently accepts lead-specific tabular models.
 
 Experiment weights, scalers, feature-selection caches, PCA artifacts, and runtime-retrained weights are stored beneath the configured `ablation.artifacts.base_dir`.
 

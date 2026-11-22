@@ -78,7 +78,7 @@ def export_lead_waterfall_plots(row: dict[str, Any], output_dir: str | Path) -> 
     generated: list[Path] = []
     contribution_percentages: dict[str, list[dict[str, float | str]]] = {}
     history_raw = observed_target_history["target_raw"].to_numpy(dtype=np.float64).tolist()
-    season = 24 if product == "viirs" else 36
+    season = 36
 
     for lead in range(1, lead_count + 1):
         selected_features = selected_by_lead.get(lead, [])

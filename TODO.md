@@ -19,11 +19,24 @@
 - [x] Test main.py for deployment (1) check it could run if data folder was empty for initial download (just by verifying paths) and (2) run with the current state of the data folder
 
 ## Model Improvements
-- [ ] Add GloFAS data
-- [ ] Improve efficiency of data extraction and training for spatial model
+- [x] Add ECMWF data: incorporate hindcasts into temporal data, retrain temporal  (ensure forecasts are forecasts, and are aligned as such e.g. for the transformer model), evaluate, set up pipeline to work with forecasts; What ECMWF data would be available on a given forecast date?
+- [x] Incorporate the ECMWF hindcasts (from the temporal CSV) into the model training pipeline that currently exists. Ensure the forecasts are treated appropriately by each forecast model. The forecasts should see the entire 40 day window 
+- [x] Why 52 ECMWF candidate features? Shouldn't there only be four? Or are the extra from the subregional ones?
+- [x] Determine why there are two base models and what they do
+- [x] Add transformer model to ablation testing
+- [x] Replace current VIIRS data with data processed by Ross
+- [ ] Ensure operational forecast uses data from the prelim folder
+- [ ] Add ECMWF forecasts from 2025-2026 to training h5, ensure live prediction files can be processed by the operational forecast
+
+- [x] Add GloFAS data
+- [x] Improve efficiency of data extraction and training for spatial model
+- [ ] Retrain spatial model with VIIRS, ECMWF, and GloFAS
 - [ ] Retrain spatial model and validate using VIIRS data
 - [ ] Train spatial model again on full data set and deploy
+- [ ] Ensure exposure layer is still used and reported on for the spatial model
 - [ ] Ensure all pipeline parameters are input in the config and not hardcoded
+- [ ] Look for any duplicated files and dead code
+- [ ] Update README to accurately descibe current pipeline (ablation, deployment, and config)
 
 ## Major Changes
 - [ ] Implement call to LLM with access to White Nile/South Sudan flooding literature to explain model results and interpret data qualitatively

@@ -27,6 +27,7 @@ import zipfile
 from processing.data_cleaning import process_inundation_modis
 from processing import cleaning_utils
 from processing.config import get_cfg
+from model.spatial.channels import CHANNEL_NAMES, ecmwf_patch, load_glofas_grid
 
 # Configure logging
 logging.basicConfig(
@@ -50,6 +51,8 @@ def generate_deployment_sequences_in_memory(
     inundation_file_path,
     rainfall_file_path,
     moisture_file_path,
+    ecmwf_file_path,
+    glofas_file_path,
     static_dir='data/maps',
     patch_size=64,
     stride=32,
@@ -60,42 +63,53 @@ def generate_deployment_sequences_in_memory(
     Generates deployment-ready spatial sequences (in memory) for the last available time slices.
 
     Returns:
-        X: np.ndarray of shape (N, sequence_length, 5, patch_size, patch_size)
+        X: np.ndarray of shape (N, sequence_length, 10, patch_size, patch_size)
         indices: np.ndarray of shape (N, 3) where each row is (t, y, x)
     """
 
     inun_len, rain_len, moist_len = check_file_lengths(
         inundation_file_path, rainfall_file_path, moisture_file_path
     )
+    with h5py.File(ecmwf_file_path, "r") as ecmwf_f:
+        ecmwf_len = int(ecmwf_f["X"].shape[0])
 
-    if not (inun_len == rain_len == moist_len):
+    if not (inun_len == rain_len == moist_len == ecmwf_len):
         logger.warning("Time series lengths do not match:")
         logger.warning(f"  - Inundation: {inun_len}")
         logger.warning(f"  - Rainfall:   {rain_len}")
         logger.warning(f"  - Moisture:   {moist_len}")
+        logger.warning(f"  - ECMWF:      {ecmwf_len}")
     
-    T = min(inun_len, rain_len, moist_len)
+    T = min(inun_len, rain_len, moist_len, ecmwf_len)
     
-    if not (inun_len == rain_len == moist_len):
+    if not (inun_len == rain_len == moist_len == ecmwf_len):
         logger.info(f"Using shortest time series ({T}) as reference.")
 
     # === Load static maps ===
     elevation = np.load(os.path.join(static_dir, 'elevation.npy'))  # (1, H, W)
     basin_attributes = np.load(os.path.join(static_dir, 'basin_attributes.npy'))[0:1]  # (1, H, W)
 
-    with h5py.File(inundation_file_path, 'r') as inun_f, \
-         h5py.File(rainfall_file_path, 'r') as rain_f, \
-         h5py.File(moisture_file_path, 'r') as moist_f:
+    # Rainfall and moisture use whole-timestep chunks. A cache large enough for
+    # the six input frames prevents decompression for every spatial patch.
+    cache_options = {"mode": "r", "rdcc_nbytes": 64 * 1024 * 1024, "rdcc_nslots": 10007}
+    with h5py.File(inundation_file_path, **cache_options) as inun_f, \
+         h5py.File(rainfall_file_path, **cache_options) as rain_f, \
+         h5py.File(moisture_file_path, **cache_options) as moist_f, \
+         h5py.File(ecmwf_file_path, **cache_options) as ecmwf_f:
 
         inundation = inun_f['inundation']
         rainfall = rain_f['rainfall']
         moisture = moist_f['moisture']
+        ecmwf = ecmwf_f['X']
+        ecmwf_transform = tuple(ecmwf_f.attrs['transform'])
+        ecmwf_crs = ecmwf_f.attrs.get('crs', 'EPSG:4326')
 
         _, H, W = inundation.shape
 
         # Trim static maps
         elevation = elevation[:, :H, :W]
         basin_attributes = basin_attributes[:, :H, :W]
+        glofas = load_glofas_grid(glofas_file_path, H, W)
 
         # Define time window
         start_t = T - (num_timesteps + sequence_length + forecast_length)
@@ -111,7 +125,10 @@ def generate_deployment_sequences_in_memory(
         logger.info(f"Generating {total_samples} input samples from time {start_t} to {end_t}...")
 
         # Preallocate in-memory arrays
-        X = np.zeros((total_samples, sequence_length, 5, patch_size, patch_size), dtype=np.float32)
+        X = np.zeros(
+            (total_samples, sequence_length, len(CHANNEL_NAMES), patch_size, patch_size),
+            dtype=np.float32,
+        )
         indices = np.zeros((total_samples, 3), dtype=np.int32)
 
         sample_idx = 0
@@ -130,8 +147,24 @@ def generate_deployment_sequences_in_memory(
                 basin_patch = basin_attributes[:, y_start:y_end, x_start:x_end]
                 elev_seq = np.repeat(elev_patch, sequence_length, axis=0)
                 basin_seq = np.repeat(basin_patch, sequence_length, axis=0)
+                glofas_patch = glofas[y_start:y_end, x_start:x_end]
+                glofas_seq = np.repeat(glofas_patch[np.newaxis, ...], sequence_length, axis=0)
+                ecmwf_seq = np.stack([
+                    ecmwf_patch(
+                        ecmwf, time_index, y_start, x_start, patch_size,
+                        ecmwf_transform, ecmwf_crs,
+                    ).transpose(2, 0, 1)
+                    for time_index in range(t, t + sequence_length)
+                ])
 
-                X_sample = np.stack([inun_seq, rain_seq, moist_seq, elev_seq, basin_seq], axis=1)
+                X_sample = np.zeros(
+                    (sequence_length, len(CHANNEL_NAMES), patch_size, patch_size), dtype=np.float32
+                )
+                X_sample[:, 0:5] = np.stack(
+                    [inun_seq, rain_seq, moist_seq, elev_seq, basin_seq], axis=1
+                )
+                X_sample[:, 5:9] = ecmwf_seq
+                X_sample[:, 9] = glofas_seq
                 X[sample_idx] = X_sample
                 indices[sample_idx] = (t, y_start, x_start)
                 sample_idx += 1
@@ -183,6 +216,12 @@ def load_deployment_inputs(X_path, indices_path):
 def predict_with_model(model, X, batch_size=32):
     logger.info("Running model prediction...")
     X_input = X.transpose(0, 1, 3, 4, 2)  # To (N, T, H, W, C)
+    expected_channels = int(model.input_shape[-1])
+    if X_input.shape[-1] != expected_channels:
+        raise ValueError(
+            f"Spatial model expects {expected_channels} channels but the configured pipeline produced "
+            f"{X_input.shape[-1]}. Retrain with python3 -m model.spatial.train_convlstm."
+        )
     print("Making spatial predictions...")
     y_pred = model.predict(X_input, batch_size=batch_size, verbose=1)
     logger.info("✅ Prediction complete")
@@ -225,19 +264,34 @@ def reconstruct_maps(y_pred, indices, full_shape, border=4):
 
 def run_inference_pipeline(
     model_path='model/spatial_model.keras',
-    inundation_file_path='data/historic/inundation.h5',
-    rainfall_file_path='data/historic/gridded_rainfall.h5',
-    moisture_file_path='data/historic/gridded_moisture.h5',
+    inundation_file_path=None,
+    rainfall_file_path=None,
+    moisture_file_path=None,
+    ecmwf_file_path=None,
+    glofas_file_path=None,
     static_dir='data/maps',
     full_shape=(1125, 1204),
     border=4
 ):
+    target_product = cleaning_utils.resolve_target_product(get_cfg("runtime.target_product", "viirs"))
+    aligned_dir = FilePath(get_cfg("paths.historic.root", "data/historic")) / f"{target_product}-aligned"
+    inundation_file_path = inundation_file_path or str(
+        aligned_dir / ("inundation_viirs.h5" if target_product == "viirs" else "inundation_modis.h5")
+    )
+    rainfall_file_path = rainfall_file_path or str(aligned_dir / "gridded_rainfall.h5")
+    moisture_file_path = moisture_file_path or str(aligned_dir / "gridded_moisture.h5")
+    ecmwf_file_path = ecmwf_file_path or str(aligned_dir / "ecmwf_hindcasts.h5")
+    glofas_file_path = glofas_file_path or get_cfg(
+        "spatial_training.glofas_path", "data/maps/flood_return_period/glofas_10_year_rp.tif"
+    )
     model = load_trained_model(model_path)
 
     X, indices = generate_deployment_sequences_in_memory(
         inundation_file_path,
         rainfall_file_path,
         moisture_file_path,
+        ecmwf_file_path,
+        glofas_file_path,
         static_dir=static_dir
     )
 

@@ -251,7 +251,7 @@ def get_dates_of_interest(start_date_str=None, end_date_str=None, target_product
     if start_date_str is None:
         start_date_str = get_target_start_date(target_product=target_product)
 
-    valid_days = {1, 16} if target_product == "viirs" else {1, 11, 21}
+    valid_days = {1, 11, 21}
 
     # Parse the start date
     try:
@@ -274,7 +274,7 @@ def get_dates_of_interest(start_date_str=None, end_date_str=None, target_product
     # Iterate through all dates between start_date and end_date
     current_date = start_date
     while current_date <= end_date:
-        # MODIS cadence: 1, 11, 21. VIIRS cadence: 1, 16.
+        # Both current target products use dekadal anchors: 1, 11, 21.
         if current_date.day in valid_days:
             dates_of_interest.append(current_date.strftime('%Y-%m-%d'))
         # Move to the next day
@@ -327,8 +327,7 @@ def group_dates_by_target_period(dates, target_product='modis'):
     """
     Group daily dates into target-product windows.
 
-    MODIS windows: day 1-10, 11-20, 21-end.
-    VIIRS windows: day 1-15, 16-end.
+    MODIS and VIIRS v2 windows: day 1-10, 11-20, 21-end.
 
     Returns:
         tuple[list[list[datetime]], list[list[int]]]
@@ -337,15 +336,12 @@ def group_dates_by_target_period(dates, target_product='modis'):
 
     period_buckets = {}
     for idx, date in enumerate(dates):
-        if target_product == 'viirs':
-            start_day = 1 if date.day <= 15 else 16
+        if date.day <= 10:
+            start_day = 1
+        elif date.day <= 20:
+            start_day = 11
         else:
-            if date.day <= 10:
-                start_day = 1
-            elif date.day <= 20:
-                start_day = 11
-            else:
-                start_day = 21
+            start_day = 21
 
         key = datetime(date.year, date.month, start_day)
         period_buckets.setdefault(key, []).append(idx)
@@ -355,13 +351,10 @@ def group_dates_by_target_period(dates, target_product='modis'):
     for period_start, indices in sorted(period_buckets.items()):
         _, last_day = calendar.monthrange(period_start.year, period_start.month)
 
-        if target_product == 'viirs':
-            expected = 15 if period_start.day == 1 else (last_day - 15)
+        if period_start.day in (1, 11):
+            expected = 10
         else:
-            if period_start.day in (1, 11):
-                expected = 10
-            else:
-                expected = last_day - 20
+            expected = last_day - 20
 
         if len(indices) == expected:
             date_groups.append([dates[i] for i in indices])

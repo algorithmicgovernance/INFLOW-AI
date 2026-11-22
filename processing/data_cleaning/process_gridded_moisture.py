@@ -20,6 +20,11 @@ import netCDF4 as nc
 import h5py
 
 from tqdm import tqdm
+from .gridded_streaming import (
+	PeriodFiles, build_grid_masks, complete_periods, inventory_daily_files,
+	quarantine_invalid_files, resolve_project_path, stream_period_grid,
+	sync_product, validate_daily_files,
+)
 
 import logging
 
@@ -289,7 +294,7 @@ def export_decadal_geotiffs(extract_folder, output_folder, target_product="modis
 			) as dst:
 				dst.write(decadal_avg, 1)
 
-			period_label = "VIIRS half-month" if target_product == "viirs" else "MODIS dekad"
+			period_label = f"{target_product.upper()} dekad"
 			print(f"Exported {period_label} GeoTIFF for {first_dekad_str}")
 
 
@@ -375,123 +380,83 @@ def update_gridded_moisture(
 	extract_folder=EXTRACTED_DOMAIN_PATH,
 	dekads_path=GR_MOISTURE_DEKADS_PATH,
 	temporal_data_path=GR_MOISTURE_TEMPORAL_PATH,
+	rebuild=False,
 ):
-	"""Combine newly downloaded gridded moisture with existing data."""
+	"""Stream downloaded daily moisture into date-indexed dekadal HDF5/CSV outputs."""
 	try:
 		target_product = cleaning_utils.resolve_target_product(None)
-		local_dates = cleaning_utils.get_local_download_dates(os.path.join(os.getcwd(), download_path))
-		needs_rebuild = False
-		if os.path.exists(GR_MOISTURE_H5_PATH) and os.path.exists(temporal_data_path):
-			with h5py.File(GR_MOISTURE_H5_PATH, "r") as hdf:
-				dset = hdf.get("moisture")
-				if dset is None or dset.shape[0] == 0:
-					needs_rebuild = True
-				else:
-					sample_indices = np.linspace(0, dset.shape[0] - 1, min(3, dset.shape[0]), dtype=int)
-					needs_rebuild = not any(np.any(dset[index] != 0) for index in sample_indices)
-			if needs_rebuild:
-				logging.info("Moisture H5 contains no non-zero samples; rebuilding H5 and CSV.")
-
-		if local_dates and os.path.exists(temporal_data_path):
-			historic_dates = get_historic_dates(temporal_data_path)
-			if historic_dates and min(local_dates) < min(historic_dates):
-				needs_rebuild = True
-				logging.info(
-					"Moisture history starts at %s but local archive starts at %s; rebuilding H5 and CSV.",
-					min(historic_dates),
-					min(local_dates),
-				)
-			if needs_rebuild:
-				for path in (GR_MOISTURE_H5_PATH, temporal_data_path):
-					if os.path.exists(path):
-						os.remove(path)
-
-		if os.path.exists(GR_MOISTURE_H5_PATH) and os.path.exists(temporal_data_path):
-			crop_historic_data(
-				file_path=GR_MOISTURE_H5_PATH,
-				temporal_data_path=temporal_data_path,
+		daily_root = resolve_project_path(download_path)
+		local = inventory_daily_files(daily_root)
+		start = cleaning_utils.get_target_start_date(target_product)
+		today = pd.Timestamp.today().normalize()
+		if not local:
+			download_gridded_moisture(
+				[start, today.strftime("%Y-%m-%d")], str(resolve_project_path(download_folder))
 			)
-
-		download_new_gridded_moisture(download_folder, target_product=target_product)
-
-		dekads_path_full = os.path.join(os.getcwd(), dekads_path)
-		export_decadal_geotiffs(extract_folder, dekads_path_full, target_product=target_product)
-		aligned_files, dates = process_new_gridded_moisture(dekads_path_full)
-		historic_dates = get_historic_dates()
-
-		pending = []
-		for i in range(len(dates)):
-			date_str = dates[i].strftime("%Y-%m-%d")
-			tif_name = aligned_files[i]
-			if date_str in historic_dates:
-				continue
-			if pd.isna(tif_name):
-				logging.warning(f"Skipping missing moisture file for date {date_str}")
-				continue
-			pending.append((os.path.join(dekads_path_full, tif_name), date_str))
-
-		if len(pending) == 0:
-			logging.info("No new files to process.")
 		else:
-			regions_gdf = cleaning_utils.extract_regions()
-			catchments = gpd.read_file(CATCHMENTS_PATH)
-
-			hdf_mode = "a" if os.path.exists(GR_MOISTURE_H5_PATH) else "w"
-
-			temporal_rows = []
-			with h5py.File(GR_MOISTURE_H5_PATH, hdf_mode) as hdf:
-				dset = hdf.get("moisture")
-
-				for tif_path, date_str in tqdm(pending, desc="Streaming moisture into H5"):
-					try:
-						moisture_2d = process_single_moisture_tif(tif_path, catchments)
-					except Exception as e:
-						raise RuntimeError(f"Failed processing moisture tif '{tif_path}': {e}") from e
-
-					if dset is None:
-						dset = hdf.create_dataset(
-							"moisture",
-							shape=(0, moisture_2d.shape[0], moisture_2d.shape[1]),
-							maxshape=(None, moisture_2d.shape[0], moisture_2d.shape[1]),
-							chunks=(1, moisture_2d.shape[0], moisture_2d.shape[1]),
-							dtype=np.float32,
-						)
-
-					current_len = dset.shape[0]
-					dset.resize(current_len + 1, axis=0)
-					dset[current_len] = moisture_2d
-
-					total_cells = moisture_2d.shape[0] * moisture_2d.shape[1]
-					row = {
-						"date": date_str,
-						"moisture": float(np.nansum(moisture_2d)),
-					}
-					moisture_3d = moisture_2d[np.newaxis, :, :]
-					for i in range(len(regions_gdf)):
-						region_data = regions_gdf.iloc[[i]]
-						region_code = gridded_stats.region_to_code_dict[region_data["region"].values[0]]
-						region_area = cleaning_utils.mask_regions(region_data, moisture_3d)
-						valid_cells = total_cells - np.sum(np.isnan(region_area[0]))
-						row[f"moisture_{region_code}"] = (
-							float(np.nansum(region_area)) / valid_cells if valid_cells > 0 else np.nan
-						)
-
-					temporal_rows.append(row)
-
-				logging.info(f"Updated moisture dataset shape: {dset.shape}")
-
-			moisture_temporal = pd.DataFrame(temporal_rows)
-			if os.path.exists(temporal_data_path):
-				moisture_temporal_historic = pd.read_csv(temporal_data_path)
-			else:
-				moisture_temporal_historic = pd.DataFrame(columns=moisture_temporal.columns)
-			moisture_temporal_new = pd.concat([moisture_temporal_historic, moisture_temporal], ignore_index=True)
-
-			moisture_temporal_new["date"] = pd.to_datetime(moisture_temporal_new["date"], errors="coerce")
-			moisture_temporal_new = moisture_temporal_new.dropna(subset=["date"])
-			moisture_temporal_new = moisture_temporal_new.sort_values("date").drop_duplicates(subset=["date"], keep="last").reset_index(drop=True)
-			moisture_temporal_new.to_csv(temporal_data_path, index=False)
+			last = max(local)
+			if last < today:
+				download_gridded_moisture(
+					[(last + pd.Timedelta(days=1)).strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")],
+					str(resolve_project_path(download_folder)),
+				)
+		local = inventory_daily_files(daily_root)
+		periods = complete_periods(local)
+		invalid = validate_daily_files(periods, "sm_c4grass")
+		if invalid:
+			invalid_paths = {path for path, _ in invalid}
+			invalid_dates = sorted(date for date, path in local.items() if path in invalid_paths)
+			for path, reason in invalid:
+				logging.error("Unreadable moisture source %s: %s", path, reason)
+			quarantine_invalid_files(invalid)
+			if invalid_dates:
+				download_gridded_moisture(
+					[invalid_dates[0].strftime("%Y-%m-%d"), invalid_dates[-1].strftime("%Y-%m-%d")],
+					str(resolve_project_path(download_folder)),
+				)
+			local = inventory_daily_files(daily_root)
+			missing_replacements = [date for date in invalid_dates if date not in local]
+			if missing_replacements:
+				raise RuntimeError(
+					"Unable to replace unreadable moisture dates: "
+					+ ", ".join(date.strftime("%Y-%m-%d") for date in missing_replacements)
+				)
+			replacement_errors = validate_daily_files(
+				[PeriodFiles(date.strftime("%Y-%m-%d"), (local[date],)) for date in invalid_dates],
+				"sm_c4grass",
+			)
+			if replacement_errors:
+				raise RuntimeError(f"Replacement moisture files are unreadable: {replacement_errors[:10]}")
+			periods = complete_periods(local)
+			remaining = validate_daily_files(periods, "sm_c4grass")
+			if remaining:
+				raise RuntimeError(f"Unreadable moisture files remain after download attempt: {remaining[:10]}")
+		masks = build_grid_masks(CATCHMENTS_PATH)
+		status, count = sync_product(
+			periods=periods,
+			hdf_path=resolve_project_path(GR_MOISTURE_H5_PATH),
+			csv_path=resolve_project_path(temporal_data_path),
+			dataset_name="moisture",
+			prefix="moisture",
+			target_product=target_product,
+			masks=masks,
+			loader=lambda period: stream_period_grid(period.files, "sm_c4grass", masks),
+			rebuild=rebuild,
+		)
+		logging.info("Moisture outputs %s (%d periods written).", status, count)
 
 	except Exception as e:
 		logging.error(f"Error processing moisture data: {e}")
 		raise
+
+
+def main():
+	import argparse
+	parser = argparse.ArgumentParser(description="Build or update target-aligned gridded moisture data.")
+	parser.add_argument("--rebuild", action="store_true")
+	args = parser.parse_args()
+	update_gridded_moisture(rebuild=args.rebuild)
+
+
+if __name__ == "__main__":
+	main()

@@ -1,5 +1,5 @@
 sources:
-  viirs_base_url: "https://gws-access.jasmin.ac.uk/public/tamsat/INFLOW/FEWSNET_SouthSudan/UofReading/Geotiffs/"
+  viirs_base_url: "https://gws-access.jasmin.ac.uk/public/tamsat/INFLOW/south-sudan_flood-maps/v2.0/final/"
   modis_base_url: "https://data.earthobservation.vam.wfp.org/public-share/sudd_wetland_monitoring/modis_flood_masks/ssdmask"
   rainfall_url: "https://gws-access.jasmin.ac.uk/public/tamsat/INFLOW/rainfall/rfe_time-series/combined/rfe_19830101-present_Lake-Victoria.csv"
   lake_levels:
@@ -13,12 +13,14 @@ sources:
     soi: "https://www.cpc.ncep.noaa.gov/data/indices/soi"
     mjo: "https://www.cpc.ncep.noaa.gov/products/precip/CWlink/daily_mjo_index/proj_norm_order.ascii"
     dmi: "https://www.cpc.ncep.noaa.gov/products/international/ocean_monitoring/indian/IODMI/mnth.ersstv5.clim19912020.dmi_current.txt"
+  ecmwf:
+    base_url: "https://gws-access.jasmin.ac.uk/public/tamsat/tamsat_alert/jess_hindcasts/"
 
 paths:
   downloads:
     root: "data/downloads"
     inundation_modis: "data/downloads/inundation_masks_modis"
-    inundation_viirs: "data/downloads/inundation_masks_viirs"
+    inundation_viirs: "data/downloads/inundation_masks_viirs_v2"
     teleconnections: "data/downloads/teleconnections"
     tamsat: "data/downloads/tamsat"
     lake_levels: "data/downloads/lake_levels"
@@ -27,6 +29,7 @@ paths:
     tamsat_rfe_dekads: "data/downloads/tamsat/rfe/dekads"
     tamsat_sm_daily: "data/downloads/tamsat/soil_moisture/data/v2.3.1/daily"
     tamsat_sm_dekads: "data/downloads/tamsat/soil_moisture/dekads"
+    ecmwf: "data/downloads/ecmwf"
   historic:
     root: "data/historic"
     inundation_h5: "data/historic/viirs-aligned/inundation_viirs.h5"
@@ -46,6 +49,8 @@ paths:
     gridded_moisture_h5: "data/historic/viirs-aligned/gridded_moisture.h5"
     gridded_rainfall_cumulative_temporal: "data/historic/viirs-aligned/gridded_rainfall_cumulative_temporal.csv"
     gridded_rainfall_cumulative_h5: "data/historic/viirs-aligned/gridded_rainfall_cumulative.h5"
+    ecmwf_hindcasts_temporal: "data/historic/viirs-aligned/ecmwf_hindcasts_temporal.csv"
+    ecmwf_hindcasts_h5: "data/historic/viirs-aligned/ecmwf_hindcasts.h5"
   maps:
     catchments: "data/maps/inflow_catchments/INFLOW_all_cmts.shp"
     admin0: "data/maps/admin_boundaries/ssd_admbnda_adm0_imwg_nbs_20230829.shp"
@@ -75,6 +80,24 @@ runtime:
   teleconnections:
     min_date: "2002-07-01"
 
+spatial_training:
+  model_path: "model/spatial_model.keras"
+  elevation_path: "data/maps/elevation.npy"
+  basin_attributes_path: "data/maps/basin_attributes.npy"
+  glofas_path: "data/maps/flood_return_period/glofas_10_year_rp.tif"
+  sequence_length: 6
+  patch_size: 64
+  stride: 32
+  patches_per_timestep: 16
+  batch_size: 4
+  hdf5_cache_mb: 64
+  mixed_precision: false
+  filters: [32]
+  epochs: 20
+  validation_fraction: 0.2
+  early_stopping_patience: 5
+  seed: 42
+
 ablation:
   enabled: true
   pipeline:
@@ -87,10 +110,11 @@ ablation:
       extreme_event_top_fraction: 0.10
     feature_selection:
       enabled: true
+      selection_model_type: "elastic_net"
       near_constant_variance_threshold: 1.0e-8
       high_correlation_threshold: 0.995
-      cv_splits: 5
-      candidate_feature_counts: [8, 16, 32, 64, 128]
+      cv_splits: 3
+      candidate_feature_counts: [8, 16, 32]
       include_all_features_candidate: true
       elastic_net:
         alpha: 0.001
@@ -103,19 +127,64 @@ ablation:
       n_components: 0.95
       whiten: false
       seed: 42
+    transformer:
+      history_length: 12
+      d_model: 64
+      nhead: 4
+      encoder_layers: 2
+      decoder_layers: 2
+      feedforward_dim: 128
+      dropout: 0.1
+      learning_rate: 0.001
+      weight_decay: 0.0001
+      batch_size: 32
+      epochs: 200
+      patience: 20
+      validation_fraction: 0.15
+      predictive_samples: 30
     optional_feature_blocks:
       calendar: true
+      include_ecmwf_hindcasts: true
       include_target_lag_features: true
       include_feature_lag_features: true
       lag_steps: [1, 2, 3, 6, 12]
   experiments:
-    models: ["random_forest"]
-    training_cutoff_dates: ["2025-07-21"]
+    models: ["random_forest", "elastic_net", "transformer"]
+    training_cutoff_dates: ["2018-01-01"]
     autoregressive_values: [false]
-    target_types: ["seasonally_differenced"]
+    target_types: ["raw", "first_differenced", "seasonally_differenced"]
     inundation_products: ["viirs"]
     seed: 42
     log_path: "model/ablation/ablation_experiment_log.csv"
+  staged:
+    enabled: true
+    top_n_model_configurations: 3
+    ranking_metric: "avg_peak_f1"
+    fixed_preprocessing:
+      include_ecmwf_hindcasts: true
+      include_target_lag_features: true
+      include_feature_lag_features: true
+    feature_block_ablations:
+      - name: "no_ecmwf"
+        include_ecmwf_hindcasts: false
+        include_target_lag_features: true
+        include_feature_lag_features: true
+      - name: "no_target_lags"
+        include_ecmwf_hindcasts: true
+        include_target_lag_features: false
+        include_feature_lag_features: true
+      - name: "no_feature_lags"
+        include_ecmwf_hindcasts: true
+        include_target_lag_features: true
+        include_feature_lag_features: false
+      - name: "no_lags"
+        include_ecmwf_hindcasts: true
+        include_target_lag_features: false
+        include_feature_lag_features: false
+      - name: "historical_only"
+        include_ecmwf_hindcasts: false
+        include_target_lag_features: false
+        include_feature_lag_features: false
   artifacts:
     base_dir: "model/ablation/artifacts"
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 
-from .experiment_runner import build_grid, run_ablation_grid
+from .experiment_runner import build_grid, run_ablation_grid, run_staged_ablation
 from processing.config import get_cfg
 
 
@@ -23,7 +23,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run temporal inundation ablation studies.")
     parser.add_argument(
         "--models",
-        default="random_forest,gradient_boosting,elastic_net,linear_regression",
+        default="random_forest,gradient_boosting,elastic_net,linear_regression,transformer",
         help="Comma-separated model types.",
     )
     parser.add_argument(
@@ -65,6 +65,13 @@ def main() -> None:
         cfg_log = get_cfg("ablation.experiments.log_path", args.log_path)
 
         if cfg_models and cfg_cutoffs and cfg_ar and cfg_targets and cfg_products:
+            staged_enabled = bool(get_cfg("ablation.staged.enabled", True))
+            fixed = get_cfg("ablation.staged.fixed_preprocessing", {})
+            fixed = {
+                "include_ecmwf_hindcasts": bool(fixed.get("include_ecmwf_hindcasts", True)),
+                "include_target_lag_features": bool(fixed.get("include_target_lag_features", True)),
+                "include_feature_lag_features": bool(fixed.get("include_feature_lag_features", True)),
+            }
             configs = build_grid(
                 model_types=[str(m).strip() for m in cfg_models],
                 cutoff_dates=[str(d).strip() for d in cfg_cutoffs],
@@ -72,8 +79,22 @@ def main() -> None:
                 target_types=[str(t).strip() for t in cfg_targets],
                 inundation_products=[str(p).strip().lower() for p in cfg_products],
                 seed=int(cfg_seed),
+                include_ecmwf_hindcasts=fixed["include_ecmwf_hindcasts"],
+                include_target_lag_features=fixed["include_target_lag_features"],
+                include_feature_lag_features=fixed["include_feature_lag_features"],
             )
-            results = run_ablation_grid(configs=configs, log_csv_path=str(cfg_log))
+            if staged_enabled:
+                feature_blocks = get_cfg("ablation.staged.feature_block_ablations", [])
+                results = run_staged_ablation(
+                    configs,
+                    feature_blocks=list(feature_blocks),
+                    fixed_preprocessing=fixed,
+                    top_n=int(get_cfg("ablation.staged.top_n_model_configurations", 3)),
+                    ranking_metric=str(get_cfg("ablation.staged.ranking_metric", "avg_peak_f1")),
+                    log_csv_path=str(cfg_log),
+                )
+            else:
+                results = run_ablation_grid(configs=configs, log_csv_path=str(cfg_log))
             success_count = sum(1 for r in results if r.get("status") == "success")
             fail_count = len(results) - success_count
 

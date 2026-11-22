@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Literal
@@ -34,15 +35,18 @@ class PreparedDataset:
     y_test_raw: np.ndarray
     test_dates: np.ndarray
     train_dates: np.ndarray
+    origin_test_dates: np.ndarray
+    origin_train_dates: np.ndarray
     history_dates: np.ndarray
     history_target_raw: np.ndarray
     raw_reconstruction_component_test: np.ndarray
+    raw_reconstruction_component_train: np.ndarray
     feature_names: list[str]
     properties: Dict[str, object]
 
 
 def _seasonal_period(product: str) -> int:
-    return 24 if product.lower().strip() == "viirs" else 36
+    return 36
 
 
 def _dataset_fingerprint(df: pd.DataFrame) -> str:
@@ -90,7 +94,24 @@ def _safe_feature_name(name: str, used: set[str], stem: str) -> str:
     return resolved
 
 
-def _build_temporal_feature_table(target_product: str) -> tuple[pd.DataFrame, list[str], list[str], str]:
+def _is_ecmwf_forecast_feature(name: str) -> bool:
+    """Return whether a column is one of the four future-rainfall lead features."""
+    return str(name).startswith("ecmwf_rainfall_") and bool(
+        re.search(r"_lead_[1-4]$", str(name))
+    )
+
+
+def _ecmwf_leads(feature_names: list[str]) -> set[int]:
+    leads = set()
+    for name in feature_names:
+        if _is_ecmwf_forecast_feature(name):
+            leads.add(int(str(name).rsplit("_lead_", 1)[1]))
+    return leads
+
+
+def _build_temporal_feature_table(
+    target_product: str, include_ecmwf_hindcasts: bool | None = None
+) -> tuple[pd.DataFrame, list[str], list[str], str]:
     aligned_dir = _resolve_aligned_folder(target_product)
     if not aligned_dir.exists():
         raise FileNotFoundError(f"Aligned historic directory not found: {aligned_dir}")
@@ -109,6 +130,14 @@ def _build_temporal_feature_table(target_product: str) -> tuple[pd.DataFrame, li
         stem = csv_path.stem
         frame = _read_temporal_file(csv_path)
 
+        ecmwf_enabled = (
+            bool(get_cfg("ablation.pipeline.optional_feature_blocks.include_ecmwf_hindcasts", True))
+            if include_ecmwf_hindcasts is None
+            else bool(include_ecmwf_hindcasts)
+        )
+        if stem == "ecmwf_hindcasts_temporal" and not ecmwf_enabled:
+            continue
+
         if merged_dates is None:
             merged_dates = frame[["date"]].copy()
         else:
@@ -126,6 +155,13 @@ def _build_temporal_feature_table(target_product: str) -> tuple[pd.DataFrame, li
         for col in numeric_cols:
             if col.startswith("percent_inundation"):
                 # Keep inundation columns out of predictors to avoid same-timestep leakage.
+                continue
+
+            if stem == "ecmwf_hindcasts_temporal" and not (
+                _is_ecmwf_forecast_feature(col)
+                or col in {"ecmwf_has_forecast", "ecmwf_init_age_days"}
+            ):
+                # Dates, ensemble size, and processing metadata are not predictors.
                 continue
 
             resolved_name = _safe_feature_name(col, used_feature_names, stem)
@@ -207,11 +243,15 @@ def _target_transform(df: pd.DataFrame, target_type: TargetType, product: str) -
     return out
 
 
-def _target_lag_features_enabled() -> bool:
+def _target_lag_features_enabled(override: bool | None = None) -> bool:
+    if override is not None:
+        return bool(override)
     return bool(get_cfg("ablation.pipeline.optional_feature_blocks.include_target_lag_features", True))
 
 
-def _feature_lag_features_enabled() -> bool:
+def _feature_lag_features_enabled(override: bool | None = None) -> bool:
+    if override is not None:
+        return bool(override)
     return bool(get_cfg("ablation.pipeline.optional_feature_blocks.include_feature_lag_features", False))
 
 
@@ -260,6 +300,8 @@ def _add_optional_feature_blocks(
     df: pd.DataFrame,
     target_for_lags: pd.Series,
     autoregressive: bool,
+    include_target_lag_features: bool | None = None,
+    include_feature_lag_features: bool | None = None,
 ) -> tuple[pd.DataFrame, list[str], list[str]]:
     out = df.copy()
     feature_lag_columns: list[str] = []
@@ -267,26 +309,50 @@ def _add_optional_feature_blocks(
 
     lag_steps = [int(v) for v in get_cfg("ablation.pipeline.optional_feature_blocks.lag_steps", [1, 2, 3, 6])]
 
-    if _feature_lag_features_enabled():
-        source_cols = [c for c in out.columns if c != "date" and not c.startswith("lag_") and "_lag_" not in c]
+    if _feature_lag_features_enabled(include_feature_lag_features):
+        source_cols = [
+            c for c in out.columns
+            if c != "date" and not c.startswith("lag_") and "_lag_" not in c
+            and not str(c).startswith("ecmwf_")
+        ]
+        lagged_features = {}
         for lag in lag_steps:
+            shifted = out[source_cols].shift(lag)
             for col in source_cols:
                 lag_col = f"{col}_lag_{lag}"
-                out[lag_col] = out[col].shift(lag)
+                lagged_features[lag_col] = shifted[col]
                 feature_lag_columns.append(lag_col)
+        if lagged_features:
+            lagged_frame = pd.DataFrame(lagged_features, index=out.index)
+            # Match assignment semantics if a prepared input already contains
+            # one of these columns: replace it instead of creating duplicates.
+            out = out.drop(columns=lagged_frame.columns, errors="ignore")
+            out = pd.concat([out, lagged_frame], axis=1)
 
     if get_cfg("ablation.pipeline.optional_feature_blocks.calendar", True):
-        out["month"] = out["date"].dt.month
-        out["day_of_year"] = out["date"].dt.dayofyear
-        out["sin_doy"] = np.sin(2.0 * np.pi * out["day_of_year"] / 366.0)
-        out["cos_doy"] = np.cos(2.0 * np.pi * out["day_of_year"] / 366.0)
+        day_of_year = out["date"].dt.dayofyear
+        calendar_features = pd.DataFrame({
+            "month": out["date"].dt.month,
+            "day_of_year": day_of_year,
+            "sin_doy": np.sin(2.0 * np.pi * day_of_year / 366.0),
+            "cos_doy": np.cos(2.0 * np.pi * day_of_year / 366.0),
+        }, index=out.index)
+        out = out.drop(columns=calendar_features.columns, errors="ignore")
+        out = pd.concat([out, calendar_features], axis=1)
 
-    if autoregressive and _target_lag_features_enabled():
+    if autoregressive and _target_lag_features_enabled(include_target_lag_features):
+        target_lags = {}
         for lag in lag_steps:
-            out[f"lag_{lag}"] = target_for_lags.shift(int(lag))
-            target_lag_columns.append(f"lag_{lag}")
+            lag_col = f"lag_{lag}"
+            target_lags[lag_col] = target_for_lags.shift(lag)
+            target_lag_columns.append(lag_col)
+        target_lag_frame = pd.DataFrame(target_lags, index=out.index)
+        out = out.drop(columns=target_lag_frame.columns, errors="ignore")
+        out = pd.concat([out, target_lag_frame], axis=1)
 
-    return out, feature_lag_columns, target_lag_columns
+    # Consolidate the concatenated blocks so later target-column assignment is
+    # not penalized by pandas DataFrame fragmentation.
+    return out.copy(), feature_lag_columns, target_lag_columns
 
 
 def _fit_train_only_transforms(
@@ -355,8 +421,13 @@ def prepare_dataset(
     run_id: str | None = None,
     model_type: str | None = None,
     forecast_horizon_periods_override: int | None = None,
+    include_ecmwf_hindcasts: bool | None = None,
+    include_target_lag_features: bool | None = None,
+    include_feature_lag_features: bool | None = None,
 ) -> PreparedDataset:
-    raw_temporal, cumulative_sources, source_files, aligned_dir = _build_temporal_feature_table(inundation_product)
+    raw_temporal, cumulative_sources, source_files, aligned_dir = _build_temporal_feature_table(
+        inundation_product, include_ecmwf_hindcasts=include_ecmwf_hindcasts
+    )
     if forecast_horizon_periods_override is not None:
         forecast_horizon_periods = int(forecast_horizon_periods_override)
         if forecast_horizon_periods < 1:
@@ -375,20 +446,38 @@ def prepare_dataset(
     # Feature table starts with all joined temporal predictors except target.
     base_features = raw_temporal.drop(columns=["target_raw"]).copy()
 
+    all_ecmwf_features = sorted(
+        column for column in base_features.columns if _is_ecmwf_forecast_feature(column)
+    )
+    ecmwf_enabled = (
+        bool(get_cfg("ablation.pipeline.optional_feature_blocks.include_ecmwf_hindcasts", True))
+        if include_ecmwf_hindcasts is None
+        else bool(include_ecmwf_hindcasts)
+    )
+    if ecmwf_enabled:
+        observed_leads = _ecmwf_leads(all_ecmwf_features)
+        if observed_leads != {1, 2, 3, 4}:
+            raise ValueError(
+                "ECMWF features must cover the complete 40-day window; "
+                f"found lead windows {sorted(observed_leads)}"
+            )
+
     # Remove known non-feature metadata columns if present.
     for non_feature in ("period_order",):
         if non_feature in base_features.columns and get_cfg("ablation.pipeline.drop_metadata_columns", True):
             base_features = base_features.drop(columns=[non_feature])
 
-    target_lag_toggle = _target_lag_features_enabled()
+    target_lag_toggle = _target_lag_features_enabled(include_target_lag_features)
     target_lag_features_used = bool(autoregressive and target_lag_toggle)
 
-    feature_lag_toggle = _feature_lag_features_enabled()
+    feature_lag_toggle = _feature_lag_features_enabled(include_feature_lag_features)
 
     features_with_blocks, feature_lag_columns, target_lag_columns = _add_optional_feature_blocks(
         base_features,
         target_for_lags=transformed_target["target"],
         autoregressive=autoregressive,
+        include_target_lag_features=include_target_lag_features,
+        include_feature_lag_features=include_feature_lag_features,
     )
 
     work_df = features_with_blocks.merge(
@@ -460,9 +549,12 @@ def prepare_dataset(
 
     test_dates = work_df.loc[test_mask, "target_date"].to_numpy()
     train_dates = work_df.loc[train_mask, "target_date"].to_numpy()
+    origin_test_dates = work_df.loc[test_mask, "date"].to_numpy()
+    origin_train_dates = work_df.loc[train_mask, "date"].to_numpy()
     history_dates = raw_temporal["date"].to_numpy()
     history_target_raw = raw_temporal["target_raw"].to_numpy(dtype=np.float32)
     component = work_df.loc[test_mask, "reconstruction_component"].to_numpy(dtype=np.float32)
+    train_component = work_df.loc[train_mask, "reconstruction_component"].to_numpy(dtype=np.float32)
 
     fingerprint_df = scaled_features.merge(
         work_df[["date", "target_raw", "target"]],
@@ -478,6 +570,10 @@ def prepare_dataset(
         "dataset_rows_train": int(train_mask.sum()),
         "dataset_rows_test": int(test_mask.sum()),
         "dataset_feature_count": int(len(feature_cols)),
+        "dataset_ecmwf_candidate_feature_count": int(len(all_ecmwf_features)),
+        "dataset_ecmwf_candidate_feature_names": "|".join(all_ecmwf_features),
+        "dataset_ecmwf_hindcasts_enabled": ecmwf_enabled,
+        "dataset_ecmwf_lead_windows": "1-10|11-20|21-30|31-40",
         "dataset_start_date": str(work_df["date"].min().date()),
         "dataset_end_date": str(work_df["date"].max().date()),
         "dataset_target_start_date": str(pd.to_datetime(work_df["target_date"]).min().date()),
@@ -526,9 +622,12 @@ def prepare_dataset(
         y_test_raw=y_test_raw,
         test_dates=test_dates,
         train_dates=train_dates,
+        origin_test_dates=origin_test_dates,
+        origin_train_dates=origin_train_dates,
         history_dates=history_dates,
         history_target_raw=history_target_raw,
         raw_reconstruction_component_test=component,
+        raw_reconstruction_component_train=train_component,
         feature_names=feature_cols,
         properties=properties,
     )

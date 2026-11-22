@@ -25,6 +25,7 @@ from model.ablation.deployment import (
 )
 from explanations.shap_explanations import export_lead_waterfall_plots
 from explanations.feature_history import export_feature_history_plots
+from processing.data_cleaning.process_ecmwf import process_ecmwf_hindcasts
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -53,15 +54,7 @@ def _forecast_window_end_date(date: pd.Timestamp, target_product: str) -> pd.Tim
     date = pd.Timestamp(date)
     product = str(target_product).strip().lower()
 
-    if product == "viirs":
-        if date.day <= 1:
-            return date.replace(day=16)
-        if date.day <= 16:
-            next_month = date + pd.offsets.MonthBegin(1)
-            return pd.Timestamp(next_month)
-        raise ValueError(f"Unexpected VIIRS forecast anchor date: {date}")
-
-    if product == "modis":
+    if product in {"viirs", "modis"}:
         if date.day <= 1:
             return date.replace(day=11)
         if date.day <= 11:
@@ -69,7 +62,7 @@ def _forecast_window_end_date(date: pd.Timestamp, target_product: str) -> pd.Tim
         if date.day <= 21:
             next_month = date + pd.offsets.MonthBegin(1)
             return pd.Timestamp(next_month)
-        raise ValueError(f"Unexpected MODIS forecast anchor date: {date}")
+        raise ValueError(f"Unexpected dekadal forecast anchor date: {date}")
 
     raise ValueError(f"Unsupported target product for forecast window formatting: {target_product}")
 
@@ -448,6 +441,10 @@ def export_graphs(bundle) -> list[Path]:
 
 def main() -> None:
     try:
+        logging.info("Processing ECMWF hindcasts...")
+        process_ecmwf_hindcasts()
+        logging.info("ECMWF hindcasts processed successfully")
+
         best_row = load_best_model_row()
         update_temporal_sources_for_best_model(best_row)
         runtime_row = retrain_best_model_on_available_data(best_row)
