@@ -14,6 +14,7 @@ import logging
 from processing import cleaning_utils
 from processing.data_cleaning import (
     process_albert,
+    process_basin_attributes,
     process_gridded_moisture,
     process_gridded_rainfall,
     process_gridded_rainfall_cumulative,
@@ -24,7 +25,7 @@ from processing.data_cleaning import (
     process_teleconnections,
     process_victoria,
 )
-from processing.data_cleaning.process_ecmwf import process_ecmwf_hindcasts
+from processing.data_cleaning.process_ecmwf import process_ecmwf_forecasts
 
 LOG = logging.getLogger(__name__)
 
@@ -50,7 +51,8 @@ def prepare_temporal_data(target_product: str | None = None) -> None:
     process_gridded_rainfall.update_gridded_rainfall()
     process_gridded_rainfall_cumulative.update_gridded_rainfall_cumulative()
     process_gridded_moisture.update_gridded_moisture()
-    process_ecmwf_hindcasts(target_product=product)
+    process_ecmwf_forecasts(target_product=product)
+    process_basin_attributes.process_basin_attributes()
 
     LOG.info("Finished preparing data in data/historic/%s-aligned", product)
 

@@ -135,3 +135,74 @@ def test_prepare_data_can_use_an_exact_validated_offline_cache(tmp_path, monkeyp
     with h5py.File(h5_path, "r") as hf:
         assert hf["inundation"].attrs["dataset_version"] == "2.0"
         assert hf["inundation"].attrs["cadence"] == "dekadal"
+
+
+def test_preliminary_catalogue_keeps_latest_version_per_dekad(monkeypatch):
+    class Response:
+        text = (
+            "dekad,version,source,flooded_km2,file\n"
+            "2026-10-01,0,VIIRS,10,prelim/ssdmask_20261001_prelim_20261015.tif\n"
+            "2026-10-01,2,VIIRS,12,prelim/ssdmask_20261001_prelim_20261031.tif\n"
+            "2026-10-11,0,VIIRS,11,prelim/ssdmask_20261011_prelim_20261023.tif\n"
+        )
+
+    monkeypatch.setattr(viirs, "_request_with_retries", lambda url: Response())
+    result = viirs._latest_preliminary_catalogue()
+    assert result["version"].tolist() == [2, 0]
+    assert result["dekad"].dt.strftime("%Y-%m-%d").tolist() == [
+        "2026-10-01", "2026-10-11"
+    ]
+
+
+def test_operational_preliminary_view_does_not_modify_final_history(tmp_path, monkeypatch):
+    historic_h5 = tmp_path / "historic.h5"
+    historic_csv = tmp_path / "historic.csv"
+    prelim_dir = tmp_path / "prelim"
+    operational_h5 = tmp_path / "operational.h5"
+    prelim_h5 = tmp_path / "prelim.h5"
+    operational_csv = tmp_path / "operational.csv"
+    original = np.array([[[0, 1], [0, 0]]], dtype=np.uint8)
+    with h5py.File(historic_h5, "w") as output:
+        output.create_dataset("inundation", data=original)
+    pd.DataFrame({
+        "file_name": ["2026-10-01.tif"], "period_start": ["2026-10-01"],
+        "year": [2026], "month": [10], "period_order": [0],
+        "percent_inundation": [0.25],
+    }).to_csv(historic_csv, index=False)
+    catalogue = pd.DataFrame({
+        "dekad": pd.to_datetime(["2026-10-01", "2026-10-11"]),
+        "version": [2, 0],
+        "file": ["prelim/finalized.tif", "prelim/ssdmask_20261011_prelim_20261023.tif"],
+    })
+    preliminary = np.array([[1, 0], [1, 0]], dtype=np.uint8)
+
+    configured = {
+        "paths.operational.viirs_h5": str(operational_h5),
+        "paths.operational.viirs_prelim_h5": str(prelim_h5),
+        "paths.operational.viirs_temporal": str(operational_csv),
+    }
+    monkeypatch.setattr(viirs, "get_cfg", lambda key, default=None: configured.get(key, default))
+    monkeypatch.setattr(viirs, "_latest_preliminary_catalogue", lambda: catalogue)
+    monkeypatch.setattr(
+        viirs, "_download_latest_preliminary",
+        lambda rows, path: ["ssdmask_20261011_prelim_20261023.tif"],
+    )
+    monkeypatch.setattr(viirs, "load_shapefile", lambda path: pd.DataFrame({"x": [1]}))
+    monkeypatch.setattr(
+        viirs, "process_and_clip_rasters",
+        lambda files, path, catchments: ([preliminary], files, {}),
+    )
+    monkeypatch.setattr(viirs.cleaning_utils, "extract_regions", lambda: None)
+
+    result_h5, result_csv, _ = viirs.prepare_operational_inundation(
+        historic_h5_path=historic_h5,
+        historic_temporal_path=historic_csv,
+        prelim_download_path=prelim_dir,
+    )
+    with h5py.File(historic_h5, "r") as source:
+        np.testing.assert_array_equal(source["inundation"][:], original)
+    with h5py.File(result_h5, "r") as source:
+        assert source["inundation"].shape == (2, 2, 2)
+        np.testing.assert_array_equal(source["inundation"][1], preliminary)
+    result = pd.read_csv(result_csv)
+    assert result["map_status"].tolist() == ["final", "preliminary"]

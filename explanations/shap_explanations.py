@@ -7,7 +7,6 @@ from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import shap
 
 from model.ablation.temporal_deployment import (
     _add_optional_feature_blocks,
@@ -29,6 +28,10 @@ def export_lead_waterfall_plots(row: dict[str, Any], output_dir: str | Path) -> 
     The feature table, saved train-only transforms, selected feature names, and
     runtime-retrained weights are the same objects used by deployment inference.
     """
+    # SHAP is optional at inference time and is imported lazily so a binary or
+    # NumPy compatibility problem cannot prevent the forecasts themselves.
+    import shap
+
     _sync_runtime_config_from_row(row)
     output_path = Path(output_dir) / "explanations"
     output_path.mkdir(parents=True, exist_ok=True)

@@ -233,24 +233,35 @@ def _sequence_class(tf):
 def _build_model(
     tf, sequence_length: int, patch_size: int, filters: list[int], forecast_horizon: int
 ):
+    kernel_size = tuple(int(value) for value in get_cfg("spatial_training.kernel_size", [3, 3]))
+    activation = str(get_cfg("spatial_training.activation", "relu"))
+    output_activation = str(get_cfg("spatial_training.output_activation", "sigmoid"))
     model = tf.keras.Sequential(name="spatial_convlstm")
     model.add(tf.keras.Input(shape=(sequence_length, patch_size, patch_size, len(CHANNEL_NAMES))))
     for index, count in enumerate(filters):
         model.add(tf.keras.layers.ConvLSTM2D(
             filters=int(count),
-            kernel_size=(3, 3),
-            activation="relu",
+            kernel_size=kernel_size,
+            activation=activation,
             padding="same",
             return_sequences=index < len(filters) - 1,
         ))
         model.add(tf.keras.layers.BatchNormalization())
     # Keep probabilities/loss in float32 even when GPU mixed precision is enabled.
     model.add(tf.keras.layers.Conv2D(
-        forecast_horizon, (3, 3), activation="sigmoid", padding="same", dtype="float32"
+        forecast_horizon, kernel_size, activation=output_activation, padding="same", dtype="float32"
     ))
     model.add(tf.keras.layers.Permute((3, 1, 2)))
     model.add(tf.keras.layers.Reshape((forecast_horizon, patch_size, patch_size, 1)))
-    model.compile(optimizer=tf.keras.optimizers.Adam(), loss="mean_squared_error", metrics=["mae"])
+    optimizer_name = str(get_cfg("spatial_training.optimizer", "adam")).lower()
+    learning_rate = float(get_cfg("spatial_training.learning_rate", 0.001))
+    optimizer = tf.keras.optimizers.get(optimizer_name)
+    optimizer.learning_rate = learning_rate
+    model.compile(
+        optimizer=optimizer,
+        loss=str(get_cfg("spatial_training.loss", "mean_squared_error")),
+        metrics=list(get_cfg("spatial_training.metrics", ["mae"])),
+    )
     return model
 
 
@@ -321,13 +332,15 @@ def train(output: str | None = None) -> Path:
     backup_dir = Path(configured_backup_dir) if configured_backup_dir else (
         paths.model.parent / f".{paths.model.stem}_training_backup"
     )
+    monitor = str(get_cfg("spatial_training.checkpoint_monitor", "val_loss"))
+    monitor_mode = str(get_cfg("spatial_training.checkpoint_mode", "min"))
     callbacks = [
         # This is the only published model artifact. It is replaced solely when
         # validation loss improves.
         tf.keras.callbacks.ModelCheckpoint(
             paths.model,
-            monitor="val_loss",
-            mode="min",
+            monitor=monitor,
+            mode=monitor_mode,
             save_best_only=True,
             save_weights_only=False,
             verbose=1,
@@ -341,16 +354,17 @@ def train(output: str | None = None) -> Path:
             delete_checkpoint=True,
         ),
         tf.keras.callbacks.EarlyStopping(
-            monitor="val_loss",
+            monitor=monitor,
             patience=int(get_cfg("spatial_training.early_stopping_patience", 10)),
             min_delta=float(get_cfg("spatial_training.early_stopping_min_delta", 1.0e-5)),
             restore_best_weights=True,
             verbose=1,
         ),
         tf.keras.callbacks.ReduceLROnPlateau(
-            monitor="val_loss", factor=0.5,
-            patience=max(2, int(get_cfg("spatial_training.early_stopping_patience", 10)) // 2),
-            min_lr=1.0e-6, verbose=1,
+            monitor=monitor,
+            factor=float(get_cfg("spatial_training.reduce_lr_factor", 0.5)),
+            patience=int(get_cfg("spatial_training.reduce_lr_patience", 5)),
+            min_lr=float(get_cfg("spatial_training.minimum_learning_rate", 1.0e-6)), verbose=1,
         ),
     ]
     try:

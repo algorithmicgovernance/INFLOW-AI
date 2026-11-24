@@ -3,10 +3,6 @@ import numpy as np
 import pandas as pd
 import h5py
 import logging
-from tqdm import tqdm
-import tensorflow as tf
-from keras.models import load_model
-from keras import backend as K
 from collections import defaultdict
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -16,14 +12,12 @@ import matplotlib.patheffects as PathEffects
 import rasterio
 from rasterio.features import rasterize
 from rasterio.warp import calculate_default_transform, reproject, Resampling
-from rasterio.transform import from_origin
 from rasterio.enums import Resampling as ResampleEnums
 from shapely.geometry import Point, MultiPolygon
 from matplotlib.patches import PathPatch
 from pathlib import Path as FilePath
 from matplotlib.path import Path as MplPath
 from matplotlib.lines import Line2D
-import zipfile
 from processing.data_cleaning import process_inundation_modis
 from processing import cleaning_utils
 from processing.config import get_cfg, resolve_forecast_horizon_periods
@@ -53,10 +47,10 @@ def generate_deployment_sequences_in_memory(
     moisture_file_path,
     ecmwf_file_path,
     glofas_file_path,
-    static_dir='data/maps',
-    patch_size=64,
-    stride=32,
-    sequence_length=6,
+    static_dir=None,
+    patch_size=None,
+    stride=None,
+    sequence_length=None,
     forecast_horizon=None):
     """
     Generates deployment-ready spatial sequences (in memory) for the last available time slices.
@@ -66,6 +60,10 @@ def generate_deployment_sequences_in_memory(
         indices: np.ndarray of shape (N, 3) where each row is (origin, y, x)
     """
 
+    static_dir = static_dir or get_cfg("spatial_prediction.static_dir", "data/maps")
+    patch_size = int(patch_size or get_cfg("spatial_training.patch_size", 64))
+    stride = int(stride or get_cfg("spatial_training.stride", 32))
+    sequence_length = int(sequence_length or get_cfg("spatial_training.sequence_length", 6))
     inun_len, rain_len, moist_len = check_file_lengths(
         inundation_file_path, rainfall_file_path, moisture_file_path
     )
@@ -86,12 +84,17 @@ def generate_deployment_sequences_in_memory(
         logger.info(f"Using shortest time series ({T}) as reference.")
 
     # === Load static maps ===
-    elevation = np.load(os.path.join(static_dir, 'elevation.npy'))  # (1, H, W)
-    basin_attributes = np.load(os.path.join(static_dir, 'basin_attributes.npy'))[0:1]  # (1, H, W)
+    elevation_path = get_cfg("spatial_training.elevation_path", os.path.join(static_dir, "elevation.npy"))
+    basin_path = get_cfg(
+        "spatial_training.basin_attributes_path", os.path.join(static_dir, "basin_attributes.npy")
+    )
+    elevation = np.load(elevation_path)  # (1, H, W)
+    basin_attributes = np.load(basin_path)[0:1]  # (1, H, W)
 
     # Rainfall and moisture use whole-timestep chunks. A cache large enough for
     # the six input frames prevents decompression for every spatial patch.
-    cache_options = {"mode": "r", "rdcc_nbytes": 64 * 1024 * 1024, "rdcc_nslots": 10007}
+    cache_mb = int(get_cfg("spatial_training.hdf5_cache_mb", 64))
+    cache_options = {"mode": "r", "rdcc_nbytes": cache_mb * 1024 * 1024, "rdcc_nslots": 10007}
     with h5py.File(inundation_file_path, **cache_options) as inun_f, \
          h5py.File(rainfall_file_path, **cache_options) as rain_f, \
          h5py.File(moisture_file_path, **cache_options) as moist_f, \
@@ -177,20 +180,6 @@ def generate_deployment_sequences_in_memory(
     return X, indices
 
 
-def masked_binary_focal_loss(gamma=2., alpha=0.25, border=4):
-    def loss(y_true, y_pred):
-        mask = tf.ones_like(y_true)
-        mask = mask[:, border:-border, border:-border, :]
-        y_true_crop = y_true[:, border:-border, border:-border, :]
-        y_pred_crop = y_pred[:, border:-border, border:-border, :]
-
-        y_pred_crop = K.clip(y_pred_crop, K.epsilon(), 1. - K.epsilon())
-        p_t = y_true_crop * y_pred_crop + (1 - y_true_crop) * (1 - y_pred_crop)
-        alpha_t = y_true_crop * alpha + (1 - y_true_crop) * (1 - alpha)
-        return K.mean(mask * (-alpha_t * K.pow(1 - p_t, gamma) * K.log(p_t)))
-    return loss
-
-
 def crop_borders(arr, border=4):
     if arr.ndim == 4:
         return arr[:, border:-border, border:-border, :]
@@ -199,25 +188,39 @@ def crop_borders(arr, border=4):
     raise ValueError(f"Expected 4D or 5D spatial predictions, got shape {arr.shape}.")
 
 
-def load_trained_model(model_path, gamma=3.0, alpha=0.95):
+def load_trained_model(model_path):
+    try:
+        from keras.models import load_model
+    except ImportError as exc:
+        raise ImportError(
+            "Spatial inference requires TensorFlow/Keras; use the spatial-training environment."
+        ) from exc
     logger.info(f"Loading model from: {model_path}")
-    model = load_model(
-        model_path,
-        custom_objects={"loss": masked_binary_focal_loss(gamma=gamma, alpha=alpha)}
-    )
+    model = load_model(model_path, compile=False)
     logger.info("✅ Model loaded")
     return model
 
 
-def load_deployment_inputs(X_path, indices_path):
-    logger.info(f"Loading input sequences from: {X_path}")
-    X = np.load(X_path)
-    indices = np.load(indices_path)
-    logger.info(f"✅ Loaded {X.shape[0]} samples for prediction")
-    return X, indices
+def validate_spatial_model_contract(model, forecast_horizon):
+    """Fail before loading large grids when the saved model is incompatible."""
+    input_shape = tuple(model.input_shape)
+    output_shape = tuple(model.output_shape)
+    expected_channels = len(CHANNEL_NAMES)
+    if len(input_shape) != 5 or int(input_shape[-1]) != expected_channels:
+        raise ValueError(
+            f"Spatial model input must be (batch, time, y, x, {expected_channels}); "
+            f"got {input_shape}. Retrain with python3 -m model.spatial.train_convlstm."
+        )
+    if len(output_shape) != 5 or int(output_shape[1]) != int(forecast_horizon):
+        raise ValueError(
+            f"Spatial model must output {forecast_horizon} future maps with shape "
+            f"(batch, horizon, y, x, 1); saved model output is {output_shape}. "
+            "The configured model file is not the six-horizon checkpoint. Retrain or "
+            "copy the correct checkpoint to spatial_training.model_path."
+        )
 
 
-def predict_with_model(model, X, batch_size=32):
+def predict_with_model(model, X, batch_size=None):
     logger.info("Running model prediction...")
     X_input = X.transpose(0, 1, 3, 4, 2)  # To (N, T, H, W, C)
     expected_channels = int(model.input_shape[-1])
@@ -227,6 +230,7 @@ def predict_with_model(model, X, batch_size=32):
             f"{X_input.shape[-1]}. Retrain with python3 -m model.spatial.train_convlstm."
         )
     print("Making spatial predictions...")
+    batch_size = int(batch_size or get_cfg("spatial_prediction.prediction_batch_size", 32))
     y_pred = model.predict(X_input, batch_size=batch_size, verbose=1)
     logger.info("✅ Prediction complete")
     return y_pred
@@ -273,15 +277,15 @@ def reconstruct_maps(y_pred, indices, full_shape, border=4):
 
 
 def run_inference_pipeline(
-    model_path='model/spatial_model.keras',
+    model_path=None,
     inundation_file_path=None,
     rainfall_file_path=None,
     moisture_file_path=None,
     ecmwf_file_path=None,
     glofas_file_path=None,
-    static_dir='data/maps',
-    full_shape=(1125, 1204),
-    border=4
+    static_dir=None,
+    full_shape=None,
+    border=None
 ):
     target_product = cleaning_utils.resolve_target_product(get_cfg("runtime.target_product", "viirs"))
     aligned_dir = FilePath(get_cfg("paths.historic.root", "data/historic")) / f"{target_product}-aligned"
@@ -294,8 +298,15 @@ def run_inference_pipeline(
     glofas_file_path = glofas_file_path or get_cfg(
         "spatial_training.glofas_path", "data/maps/flood_return_period/glofas_10_year_rp.tif"
     )
+    model_path = model_path or get_cfg("spatial_training.model_path", "model/spatial_model.keras")
+    static_dir = static_dir or get_cfg("spatial_prediction.static_dir", "data/maps")
+    border = int(border if border is not None else get_cfg("spatial_prediction.patch_border", 4))
+    with h5py.File(inundation_file_path, "r") as hdf:
+        inferred_shape = tuple(map(int, hdf["inundation"].shape[-2:]))
+    full_shape = tuple(full_shape or inferred_shape)
     model = load_trained_model(model_path)
     forecast_horizon = resolve_forecast_horizon_periods()
+    validate_spatial_model_contract(model, forecast_horizon)
 
     X, indices = generate_deployment_sequences_in_memory(
         inundation_file_path,
@@ -317,10 +328,7 @@ def run_inference_pipeline(
     return maps
 
 
-def load_spatial_ref(inundation_path="data/downloads/inundation_masks_modis/20250211.tif",
-                     catchments_path="data/maps/inflow_catchments/INFLOW_all_cmts.shp",
-                     download_path='data/downloads/inundation_masks_modis',
-                     inundation_file="20250211.tif"):
+def load_spatial_ref(inundation_path, catchments_path, download_path, inundation_file):
     # Process the new TIF files
     with rasterio.open(inundation_path) as src:
         inundation = src.read(1)  # First band
@@ -483,31 +491,6 @@ def get_exposure_points(hospital_path=None, school_path=None):
     return gpd.GeoDataFrame(all_points, geometry='geometry', crs='EPSG:4326')
 
 
-def get_impacted_exposure_points(points_gdf, aligned_mask, transform):
-    if points_gdf.empty:
-        return pd.DataFrame(columns=['name', 'latitude', 'longitude', 'facility_type', 'impacted'])
-
-    # We assume points_gdf is already in the same CRS as the mask transform.
-    points = points_gdf
-
-    xs = points.geometry.x.to_list()
-    ys = points.geometry.y.to_list()
-
-    # rasterio.transform.rowcol returns (row, col) based on coordinate-to-pixel mapping.
-    rows, cols = rasterio.transform.rowcol(transform, xs, ys, op=np.floor)
-
-    impacted = []
-    for row, col in zip(rows, cols):
-        if 0 <= row < aligned_mask.shape[0] and 0 <= col < aligned_mask.shape[1]:
-            impacted.append(bool(aligned_mask[row, col] == 1))
-        else:
-            impacted.append(False)
-
-    out = points.copy()
-    out['impacted'] = impacted
-    return out
-
-
 def _classify_change(in_current, in_scenario):
     if in_current and not in_scenario:
         return "become_dry"
@@ -518,20 +501,23 @@ def _classify_change(in_current, in_scenario):
     return "become_wet"
 
 
-def export_impacted_facilities(masks, current_extent, metas, inundation_file, points_gdf, output_dir, filename):
+def export_impacted_facilities(masks, current_extent, metas, inundation_file, points_gdf,
+                               output_dir, filename, source_transform=None, source_crs=None):
     if points_gdf.empty:
         logger.warning("No exposure points found, skipping impact CSV generation.")
         return None
 
     target_crs = metas[inundation_file]["crs"]
     target_transform = metas[inundation_file]["transform"]
+    source_transform = source_transform or target_transform
+    source_crs = source_crs or target_crs
 
     points_projected = points_gdf.to_crs(target_crs)
 
     current_aligned = align_mask(
         (current_extent > 0).astype(np.uint8),
-        metas[inundation_file]["transform"],
-        metas[inundation_file]["crs"],
+        source_transform,
+        source_crs,
         metas,
         inundation_file
     )
@@ -555,8 +541,8 @@ def export_impacted_facilities(masks, current_extent, metas, inundation_file, po
     for scenario in ["Worst Case", "Average Case", "Best Case"]:
         scenario_aligned = align_mask(
             (masks[scenario] > 0).astype(np.uint8),
-            metas[inundation_file]["transform"],
-            metas[inundation_file]["crs"],
+            source_transform,
+            source_crs,
             metas,
             inundation_file
         )
@@ -578,10 +564,10 @@ def plot_flood_change_map(
     title="Flood Change Map", region_name=None):
 
     # --- Align all masks ---
-    current = align_mask((current_extent > 0).astype(np.uint8), metas[inundation_file]["transform"], metas[inundation_file]['crs'], metas, inundation_file)
-    worst = align_mask((masks["Worst Case"] > 0).astype(np.uint8), metas[inundation_file]["transform"], metas[inundation_file]['crs'], metas, inundation_file)
-    avg = align_mask((masks["Average Case"] > 0).astype(np.uint8), metas[inundation_file]["transform"], metas[inundation_file]['crs'], metas, inundation_file)
-    best = align_mask((masks["Best Case"] > 0).astype(np.uint8), metas[inundation_file]["transform"], metas[inundation_file]['crs'], metas, inundation_file)
+    current = align_mask((current_extent > 0).astype(np.uint8), transform, crs, metas, inundation_file)
+    worst = align_mask((masks["Worst Case"] > 0).astype(np.uint8), transform, crs, metas, inundation_file)
+    avg = align_mask((masks["Average Case"] > 0).astype(np.uint8), transform, crs, metas, inundation_file)
+    best = align_mask((masks["Best Case"] > 0).astype(np.uint8), transform, crs, metas, inundation_file)
 
     # Use the transform from clipped raster metadata (not src!)
     out_meta = metas[inundation_file].copy()
@@ -704,7 +690,8 @@ def plot_flood_change_map(
     if region_name:
       pop_label = 'Population centre'
     else:
-      pop_label = 'Population centre (≥10,000 people)'
+      minimum_population = int(get_cfg("spatial_prediction.minimum_population", 10000))
+      pop_label = f'Population centre (≥{minimum_population:,} people)'
 
     population_legend = Line2D(
         [0], [0],
@@ -748,12 +735,16 @@ def plot_flood_change_map(
         ])
 
     # Plot population centres
-    pop_centres = gpd.read_file("data/maps/population_centres/hotosm_ssd_populated_places_points_shp.shp")
+    pop_centres = gpd.read_file(get_cfg(
+        "spatial_prediction.population_centres_path",
+        "data/maps/population_centres/hotosm_ssd_populated_places_points_shp.shp",
+    ))
     pop_centres['name_en'] = np.where(pop_centres['name_en'].isna(), pop_centres['name'], pop_centres['name_en'])
     if pop_centres.crs != target_crs:
       pop_centres = pop_centres.to_crs(target_crs)
     pop_centres = pop_centres[pop_centres['population'].notna()]
-    pop_centres = pop_centres[pop_centres['population'].astype(int) >= 10000]
+    minimum_population = int(get_cfg("spatial_prediction.minimum_population", 10000))
+    pop_centres = pop_centres[pop_centres['population'].astype(int) >= minimum_population]
 
     # Filter to selected region if applicable
     if region_name:
@@ -842,7 +833,7 @@ def plot_flood_change_map(
     ax.set_title(title, size=16)
     ax.text(
     0.5, 1.01,  # x centered, y just under the main title
-    "*Forecast of MODIS flood mask at 1km x 1km resolution",  # your subtitle text
+    f"*Forecast of {cleaning_utils.resolve_target_product(None).upper()} flood extent",
     transform=ax.transAxes,
     ha='center',
     fontsize=10,
@@ -852,23 +843,6 @@ def plot_flood_change_map(
     plt.tight_layout()
 
     return fig
-
-
-def load_latest_prediction_csv(base_path="predictions"):
-    subdirs = [os.path.join(base_path, d) for d in os.listdir(base_path)
-               if os.path.isdir(os.path.join(base_path, d))]
-    if not subdirs:
-        raise FileNotFoundError("No subdirectories found in predictions folder.")
-
-    latest_folder = max(subdirs, key=os.path.getmtime)
-    folder_name = os.path.basename(latest_folder)
-    csv_files = [f for f in os.listdir(latest_folder) if f.endswith('.csv')]
-
-    if len(csv_files) != 1:
-        raise ValueError("Expected one CSV file in latest prediction folder.")
-
-    df = pd.read_csv(os.path.join(latest_folder, csv_files[0]), index_col=0)
-    return df, folder_name
 
 
 def generate_flood_mask(prob_map, flood_percent):
@@ -882,231 +856,111 @@ def generate_flood_mask(prob_map, flood_percent):
     return binary_mask
 
 
-def export_raster(mask, path, transform, crs):
-    with rasterio.open(
-        path,
-        'w',
-        driver='GTiff',
-        height=mask.shape[0],
-        width=mask.shape[1],
-        count=1,
-        dtype='uint8',
-        crs=crs,
-        transform=transform
-    ) as dst:
-        dst.write(mask.astype('uint8'), 1)
+def run_operational_spatial_analysis(temporal_prediction_csv):
+    """Generate one flood-change map and facility report for every forecast lead."""
+    if not bool(get_cfg("spatial_prediction.enabled", True)):
+        logger.info("Spatial prediction is disabled in config.yaml")
+        return []
 
-
-def export_qgis_files(masks, current_extent, transform, crs, regions_gdf, folder_title,
-                      metas, inundation_file='20250211.tif'):
-  
-    from tempfile import TemporaryDirectory
-
-    zip_path = FilePath(f"predictions/{folder_title}/spatial_predictions/flood_prediction_spatial_data.zip")
-    with TemporaryDirectory() as temp_dir:
-        temp_path = FilePath(temp_dir)
-
-        transform = metas[inundation_file]["transform"]
-        crs = metas[inundation_file]["crs"]
-
-        # Align and export rasters
-        export_raster(
-            align_mask((masks["Worst Case"] > 0).astype(np.uint8),
-                      metas[inundation_file]["transform"],
-                      metas[inundation_file]["crs"], metas, inundation_file),
-            temp_path / "flood_scenario_worst.tif", transform, crs
-        )
-
-        export_raster(
-            align_mask((masks["Average Case"] > 0).astype(np.uint8),
-                      metas[inundation_file]["transform"],
-                      metas[inundation_file]["crs"], metas, inundation_file),
-            temp_path / "flood_scenario_average.tif", transform, crs
-        )
-
-        export_raster(
-            align_mask((masks["Best Case"] > 0).astype(np.uint8),
-                      metas[inundation_file]["transform"],
-                      metas[inundation_file]["crs"], metas, inundation_file),
-            temp_path / "flood_scenario_best.tif", transform, crs
-        )
-
-        export_raster(
-            align_mask((current_extent > 0).astype(np.uint8),
-                      metas[inundation_file]["transform"],
-                      metas[inundation_file]["crs"], metas, inundation_file),
-            temp_path / "current_extent.tif", transform, crs
-        )
-
-        regions_gdf.to_file(temp_path / "admin_boundaries.shp")
-
-        pop_centres = gpd.read_file("data/maps/population_centres/hotosm_ssd_populated_places_points_shp.shp")
-        pop_centres = pop_centres[pop_centres['population'].notna()]
-        pop_centres = pop_centres[pop_centres['population'].astype(int) >= 10000]
-        pop_centres = pop_centres.to_crs(crs)
-        pop_centres.to_file(temp_path / "population_centres.shp")
-
-        msf_data = [
-            ("Leer", 8.301, 30.107),
-            ("Lankien", 8.519, 31.956),
-            ("Bentiu", 9.239, 29.506),
-            ("Renk", 11.746, 32.766),
-            ("EGPAA (Boma & Maruwa)", 6.234, 34.193),
-            ("Old Fangak", 9.0707, 30.8146),
-            ("Aweil", 8.721, 27.276),
-            ("Abyei", 9.628, 28.0616),
-            ("Twic (Mayen Abun)", 9.1275, 28.11)
-        ]
-        msf_gdf = gpd.GeoDataFrame(
-            msf_data,
-            columns=["name", "lat", "lon"],
-            geometry=gpd.points_from_xy([x[2] for x in msf_data], [x[1] for x in msf_data]),
-            crs="EPSG:4326"
-        ).to_crs(crs)
-        msf_gdf.to_file(temp_path / "msf_locations.shp")
-
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for file in temp_path.rglob("*"):
-                zipf.write(file, arcname=file.name)
-
-        print(f"Exported QGIS-ready files to: {zip_path.resolve()}")
-
-
-def run_full_spatial_analysis():
     target_product = cleaning_utils.resolve_target_product(None)
-    inundation_h5_path = get_cfg(
-        "paths.historic.viirs_h5" if target_product == "viirs" else "paths.historic.inundation_h5",
-        "data/historic/inundation_viirs.h5" if target_product == "viirs" else "data/historic/inundation.h5",
+    historic_key = ("paths.historic.viirs_h5" if target_product == "viirs"
+                    else "paths.historic.modis_h5")
+    download_key = ("paths.downloads.inundation_viirs" if target_product == "viirs"
+                    else "paths.downloads.inundation_modis")
+    inundation_h5_path = FilePath(get_cfg(
+        historic_key,
+        f"data/historic/{target_product}-aligned/inundation_{target_product}.h5",
+    ))
+    inundation_download_path = FilePath(get_cfg(
+        download_key, f"data/downloads/inundation_masks_{target_product}",
+    ))
+    catchments_path = get_cfg(
+        "spatial_prediction.catchments_path",
+        get_cfg("paths.maps.catchments", "data/maps/inflow_catchments/INFLOW_all_cmts.shp"),
     )
-    inundation_download_path = get_cfg(
-        "paths.downloads.inundation_viirs" if target_product == "viirs" else "paths.downloads.inundation_modis",
-        f"data/downloads/inundation_masks_{target_product}",
+    raw_rasters = sorted(inundation_download_path.glob("*.tif"))
+    if not inundation_h5_path.exists():
+        raise FileNotFoundError(f"Spatial inundation HDF5 does not exist: {inundation_h5_path}")
+    if not raw_rasters:
+        raise FileNotFoundError(f"No target inundation rasters found in {inundation_download_path}")
+
+    temporal_prediction_csv = FilePath(temporal_prediction_csv)
+    predictions = pd.read_csv(temporal_prediction_csv)
+    interval = int(get_cfg("forecast.interval_percent", 80))
+    lower_column = f"lower_bound_{interval}_fraction"
+    upper_column = f"upper_bound_{interval}_fraction"
+    required = {"date", "predicted_fraction", lower_column, upper_column}
+    missing = required.difference(predictions.columns)
+    if missing:
+        raise ValueError(f"Temporal prediction CSV is missing columns: {sorted(missing)}")
+    predictions = predictions[predictions["predicted_fraction"].notna()].copy()
+    predictions["date"] = pd.to_datetime(predictions["date"])
+    horizon = resolve_forecast_horizon_periods()
+    if len(predictions) != horizon:
+        raise ValueError(f"Expected {horizon} temporal forecast rows, found {len(predictions)}")
+
+    maps = run_inference_pipeline(inundation_file_path=str(inundation_h5_path))
+    if sorted(maps) != list(range(1, horizon + 1)):
+        raise RuntimeError(f"Expected spatial leads 1..{horizon}, received {sorted(maps)}")
+
+    latest_raster = raw_rasters[-1]
+    inundation_file = latest_raster.name
+    _, _, regions_gdf, _ = load_spatial_ref(
+        str(latest_raster), catchments_path, str(inundation_download_path), inundation_file,
     )
-
-    if not os.path.exists(inundation_h5_path):
-        logger.warning(
-            "Skipping spatial analysis: target inundation H5 does not exist at %s",
-            inundation_h5_path,
-        )
-        return
-
-    inundation_files = sorted(
-        os.path.join(inundation_download_path, name)
-        for name in os.listdir(inundation_download_path)
-        if name.lower().endswith(".tif")
-    ) if os.path.isdir(inundation_download_path) else []
-    if not inundation_files:
-        logger.warning(
-            "Skipping spatial analysis: no %s inundation rasters found in %s",
-            target_product,
-            inundation_download_path,
-        )
-        return
-
-    # Run inference
-    maps = run_inference_pipeline(inundation_file_path=inundation_h5_path)
-
-    # Load prediction CSV
-    pred_df, folder_title = load_latest_prediction_csv()
-
-    # Determine example time index
-    expected_horizon = resolve_forecast_horizon_periods()
-    if sorted(maps) != list(range(1, expected_horizon + 1)):
-        raise RuntimeError(
-            f"Expected spatial leads 1..{expected_horizon}, received {sorted(maps)}."
-        )
-    example_t = sorted(maps.keys())[-1]
-
-    # Extract flood thresholds
-    flood_percentages = {
-        "Worst Case": pred_df.iloc[-1]['upper_bound_95'],
-        "Average Case": pred_df.iloc[-1]['percent_inundation'],
-        "Best Case": pred_df.iloc[-1]['lower_bound_95']
-    }
-
-    # Generate flood masks
-    masks = {
-        scenario: generate_flood_mask(maps[example_t], pct)
-        for scenario, pct in flood_percentages.items()
-    }
-
-    # Load spatial reference and current extent
-    with h5py.File(inundation_h5_path, 'r') as f:
-        current_extent = f['inundation'][-1]
-
-    transform, crs, regions_gdf, _ = load_spatial_ref()
-
-    # Load transformation reference
-    inundation_path = inundation_files[-1]
-    catchments_path="data/maps/inflow_catchments/INFLOW_all_cmts.shp"
-    download_path = inundation_download_path
-    inundation_file = os.path.basename(inundation_path)
-
-    # Process the new TIF files
-    with rasterio.open(inundation_path) as src:
-        inundation = src.read(1)  # First band
-        transform = src.transform
-        crs = src.crs
-        width = src.width
-        height = src.height
     catchments = process_inundation_modis.load_shapefile(catchments_path)
-    catchments = process_inundation_modis.reproject_to_raster_crs(catchments, inundation_path)
-
-    # Run the clipping function
+    catchments = process_inundation_modis.reproject_to_raster_crs(catchments, str(latest_raster))
     inundation_clipped, _, metas = process_inundation_modis.process_and_clip_rasters(
-        [inundation_file], download_path, catchments)
-
-    # Create output directory
-    output_dir = FilePath(f"predictions/{folder_title}/spatial_predictions")
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Plot full country
-    title = f"Predicted South Sudan Flood Extent Change from {folder_title[23:33]} to {folder_title[-10:]}\n"
-    fig = plot_flood_change_map(masks, current_extent, transform, crs, regions_gdf,
-                                inundation_clipped, metas, inundation_file=inundation_file, title=title)
-    fig.savefig(output_dir / f"south_sudan_spatial_prediction_{folder_title[23:33]}_to_{folder_title[-10:]}.png", dpi=300)
-    plt.close(fig)
-
-    # Plot regions
-    for region in regions_gdf['region']:
-        if region.strip().lower() == "south sudan":
-            continue
-
-        region_clean = "_".join(region.lower().split())
-        title = f"Predicted {region} Flood Extent Change from {folder_title[23:33]} to {folder_title[-10:]}\n"
-
-        try:
-            fig = plot_flood_change_map(
-                masks, current_extent, transform, crs, regions_gdf,
-                inundation_clipped, metas, inundation_file=inundation_file,
-                region_name=region, title=title)
-            filename = f"{region_clean}_spatial_prediction_{folder_title[23:33]}_to_{folder_title[-10:]}.png"
-            fig.savefig(output_dir / filename, dpi=300)
-            plt.close(fig)
-        except Exception as e:
-            print(f"Error plotting {region}: {e}")
-
-    # Export for QGIS
-    export_qgis_files(masks, current_extent, transform, crs, regions_gdf, folder_title, metas, inundation_file=inundation_file)
-
-    # --- Exposure impact reporting for schools and hospitals ---
-    hospital_csv = 'data/maps/exposure/hospitals.csv'
-    school_csv = 'data/maps/exposure/schools.csv'
-    
-    impacted_dir = output_dir / "impacted_facilities"
-    impacted_dir.mkdir(parents=True, exist_ok=True)
-    
-    hospital_points = get_exposure_points(hospital_csv, None)
-    school_points = get_exposure_points(None, school_csv)
-    
-    export_impacted_facilities(
-        masks, current_extent, metas, inundation_file,
-        hospital_points, impacted_dir, "impacted_hospitals.csv"
+        [inundation_file], str(inundation_download_path), catchments,
     )
-    
-    export_impacted_facilities(
-        masks, current_extent, metas, inundation_file,
-        school_points, impacted_dir, "impacted_schools.csv"
+    with h5py.File(inundation_h5_path, "r") as hdf:
+        current_extent = np.asarray(hdf["inundation"][-1])
+
+    hospital_points = get_exposure_points(
+        get_cfg("spatial_prediction.hospitals_path", "data/maps/exposure/hospitals.csv"), None,
     )
-    
-    logger.info('run_full_spatial_analysis completed: flood maps and exposure impact report generated.')
+    school_points = get_exposure_points(
+        None, get_cfg("spatial_prediction.schools_path", "data/maps/exposure/schools.csv"),
+    )
+    output_root = temporal_prediction_csv.parent / get_cfg(
+        "spatial_prediction.output_subdirectory", "spatial_predictions",
+    )
+    output_root.mkdir(parents=True, exist_ok=True)
+    dpi = int(get_cfg("spatial_prediction.map_dpi", 300))
+    outputs = []
+
+    source_transform = rasterio.Affine(*cleaning_utils.MASK_REGIONS_REF_TRANSFORM)
+    source_crs = cleaning_utils.MASK_REGIONS_REF_CRS
+    for lead, (_, forecast) in enumerate(predictions.iterrows(), start=1):
+        forecast_date = forecast["date"].strftime("%Y-%m-%d")
+        lead_dir = output_root / f"lead_{lead:02d}_{forecast_date}"
+        facilities_dir = lead_dir / "impacted_facilities"
+        facilities_dir.mkdir(parents=True, exist_ok=True)
+        fractions = {
+            "Worst Case": float(np.clip(forecast[upper_column], 0.0, 1.0)),
+            "Average Case": float(np.clip(forecast["predicted_fraction"], 0.0, 1.0)),
+            "Best Case": float(np.clip(forecast[lower_column], 0.0, 1.0)),
+        }
+        masks = {name: generate_flood_mask(maps[lead], value)
+                 for name, value in fractions.items()}
+        title = f"Predicted South Sudan Flood Extent Change: {forecast_date} (lead {lead})"
+        figure = plot_flood_change_map(
+            masks, current_extent, source_transform, source_crs, regions_gdf,
+            inundation_clipped, metas, inundation_file=inundation_file, title=title,
+        )
+        map_path = lead_dir / "flood_change_map.png"
+        figure.savefig(map_path, dpi=dpi, bbox_inches="tight")
+        plt.close(figure)
+        hospital_path = export_impacted_facilities(
+            masks, current_extent, metas, inundation_file, hospital_points,
+            facilities_dir, "impacted_hospitals.csv", source_transform, source_crs,
+        )
+        school_path = export_impacted_facilities(
+            masks, current_extent, metas, inundation_file, school_points,
+            facilities_dir, "impacted_schools.csv", source_transform, source_crs,
+        )
+        outputs.extend(path for path in (map_path, hospital_path, school_path) if path is not None)
+
+    logger.info("Generated operational spatial outputs for %d forecast leads in %s",
+                horizon, output_root)
+    return outputs

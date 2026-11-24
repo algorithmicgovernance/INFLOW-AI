@@ -5,6 +5,8 @@ import calendar
 import logging
 import time
 from datetime import datetime
+from io import StringIO
+from pathlib import Path
 from urllib.parse import urljoin
 
 # Import data manipulation libraries
@@ -39,9 +41,21 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # -----------------------------------------------------------------------------
 
 VIIRS_BASE_URL = get_cfg(
-    "sources.viirs_base_url",
+    "sources.viirs_final_base_url",
+    get_cfg(
+        "sources.viirs_base_url",
+        "https://gws-access.jasmin.ac.uk/public/tamsat/INFLOW/"
+        "south-sudan_flood-maps/v2.0/final/",
+    ),
+)
+VIIRS_PRELIM_BASE_URL = get_cfg(
+    "sources.viirs_prelim_base_url",
     "https://gws-access.jasmin.ac.uk/public/tamsat/INFLOW/"
-    "south-sudan_flood-maps/v2.0/final/",
+    "south-sudan_flood-maps/v2.0/prelim/",
+)
+VIIRS_PRELIM_CATALOGUE_URL = get_cfg(
+    "sources.viirs_prelim_catalogue_url",
+    urljoin(VIIRS_PRELIM_BASE_URL, "prelim_versions.csv"),
 )
 
 VIIRS_PERIOD_ORDER = {
@@ -54,6 +68,10 @@ VIIRS_DATASET_VERSION = "2.0"
 VIIRS_CADENCE = "dekadal"
 
 VIIRS_DOWNLOAD_PATH = get_cfg("paths.downloads.inundation_viirs", "data/downloads/inundation_masks_viirs")
+VIIRS_PRELIM_DOWNLOAD_PATH = get_cfg(
+    "paths.downloads.inundation_viirs_prelim",
+    "data/downloads/inundation_masks_viirs_prelim",
+)
 VIIRS_H5_PATH = get_cfg("paths.historic.viirs_h5", "data/historic/inundation_viirs.h5")
 VIIRS_TEMPORAL_PATH = get_cfg(
     "paths.historic.viirs_temporal",
@@ -64,6 +82,28 @@ INFLOW_CATCHMENTS_PATH = get_cfg(
     "paths.maps.catchments",
     "data/maps/inflow_catchments/INFLOW_all_cmts.shp",
 )
+
+
+def _request_with_retries(url, *, stream=False):
+    retries = int(get_cfg("runtime.viirs.request_retries", 3))
+    delay_seconds = float(get_cfg("runtime.viirs.retry_delay_seconds", 2))
+    timeout = float(get_cfg("runtime.viirs.request_timeout_seconds", 120))
+    last_error = None
+    for attempt in range(1, retries + 1):
+        try:
+            response = requests.get(
+                url,
+                stream=stream,
+                timeout=(20, timeout),
+                headers={"User-Agent": "INFLOW-AI/1.0"},
+            )
+            response.raise_for_status()
+            return response
+        except requests.RequestException as error:
+            last_error = error
+            if attempt < retries:
+                time.sleep(delay_seconds * (2 ** (attempt - 1)))
+    raise RuntimeError(f"Unable to download VIIRS resource {url}: {last_error}") from last_error
 
 
 def parse_viirs_filename(file_name):
@@ -965,3 +1005,136 @@ def update_inundation(h5_file_path=VIIRS_H5_PATH,
         raise
 
     logging.info("VIIRS inundation processing complete.\\n")
+
+
+def _latest_preliminary_catalogue():
+    """Return the latest published preliminary version for every dekad."""
+    response = _request_with_retries(VIIRS_PRELIM_CATALOGUE_URL)
+    catalogue = pd.read_csv(StringIO(response.text))
+    required = {"dekad", "version", "file"}
+    missing = required.difference(catalogue.columns)
+    if missing:
+        raise ValueError(f"VIIRS preliminary catalogue is missing {sorted(missing)}")
+    catalogue["dekad"] = pd.to_datetime(catalogue["dekad"], errors="coerce")
+    catalogue["version"] = pd.to_numeric(catalogue["version"], errors="coerce")
+    catalogue = catalogue.dropna(subset=["dekad", "version", "file"])
+    latest = catalogue.sort_values(["dekad", "version"]).drop_duplicates("dekad", keep="last")
+    return latest.sort_values("dekad").reset_index(drop=True)
+
+
+def _download_latest_preliminary(rows, download_path):
+    folder = Path(download_path)
+    folder.mkdir(parents=True, exist_ok=True)
+    local_files = []
+    for row in rows.itertuples(index=False):
+        remote_basename = Path(str(row.file)).name
+        destination = folder / remote_basename
+        if not destination.exists() or destination.stat().st_size == 0:
+            response = _request_with_retries(
+                urljoin(VIIRS_PRELIM_BASE_URL, remote_basename), stream=True
+            )
+            partial = destination.with_suffix(destination.suffix + ".part")
+            try:
+                with partial.open("wb") as output:
+                    for chunk in response.iter_content(chunk_size=4 * 1024 * 1024):
+                        if chunk:
+                            output.write(chunk)
+                if partial.stat().st_size == 0:
+                    raise RuntimeError(f"Empty VIIRS preliminary download: {remote_basename}")
+                partial.replace(destination)
+            finally:
+                partial.unlink(missing_ok=True)
+        local_files.append(destination.name)
+    return local_files
+
+
+def prepare_operational_inundation(
+    historic_h5_path=VIIRS_H5_PATH,
+    historic_temporal_path=VIIRS_TEMPORAL_PATH,
+    prelim_download_path=VIIRS_PRELIM_DOWNLOAD_PATH,
+):
+    """Build a final-history plus latest-preliminary operational VIIRS view.
+
+    The immutable historical HDF5/CSV are never modified here. Preliminary
+    maps whose dekads already exist in the final archive are excluded.
+    """
+    operational_h5 = Path(get_cfg(
+        "paths.operational.viirs_h5", "data/operational/inundation_viirs.h5"
+    ))
+    prelim_h5 = Path(get_cfg(
+        "paths.operational.viirs_prelim_h5", "data/operational/inundation_viirs_prelim.h5"
+    ))
+    operational_csv = Path(get_cfg(
+        "paths.operational.viirs_temporal", "data/operational/inundation_viirs_temporal.csv"
+    ))
+    historic_h5 = Path(historic_h5_path).resolve()
+    historic_csv = Path(historic_temporal_path)
+    if not historic_h5.exists() or not historic_csv.exists():
+        raise FileNotFoundError(
+            "Final VIIRS HDF5 and temporal CSV must exist before operational overlay"
+        )
+
+    final_temporal = pd.read_csv(historic_csv)
+    final_dates = set(pd.to_datetime(_viirs_observation_dates(final_temporal)).dt.normalize())
+    latest = _latest_preliminary_catalogue()
+    selected = latest[~latest["dekad"].dt.normalize().isin(final_dates)].copy()
+    if selected.empty:
+        logging.info("No non-final VIIRS preliminary dekads are currently available.")
+        return str(historic_h5), str(historic_csv), str(VIIRS_DOWNLOAD_PATH)
+
+    local_files = _download_latest_preliminary(selected, prelim_download_path)
+    catchments = load_shapefile(INFLOW_CATCHMENTS_PATH)
+    if catchments is None or catchments.empty:
+        raise ValueError(f"No catchment geometries found in {INFLOW_CATCHMENTS_PATH}")
+    arrays, names, _ = process_and_clip_rasters(
+        local_files, prelim_download_path, catchments
+    )
+    if len(arrays) != len(local_files):
+        raise RuntimeError("One or more operational VIIRS preliminary maps could not be processed")
+
+    prelim_temporal = build_viirs_temporal_dataframe(
+        names, arrays, regions_gdf=cleaning_utils.extract_regions()
+    )
+    prelim_temporal["map_status"] = "preliminary"
+    version_by_date = dict(zip(
+        selected["dekad"].dt.normalize(), selected["version"].astype(int)
+    ))
+    prelim_temporal["preliminary_version"] = pd.to_datetime(
+        prelim_temporal["period_start"]
+    ).dt.normalize().map(version_by_date)
+    final_temporal["map_status"] = "final"
+    final_temporal["preliminary_version"] = np.nan
+    combined = pd.concat([final_temporal, prelim_temporal], ignore_index=True, sort=False)
+    combined = combined.sort_values(["year", "month", "period_order"]).reset_index(drop=True)
+
+    operational_h5.parent.mkdir(parents=True, exist_ok=True)
+    operational_csv.parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(prelim_h5, "w") as output:
+        output.create_dataset(
+            VIIRS_DSET_NAME, data=np.asarray(arrays, dtype=np.uint8), chunks=True
+        )
+    with h5py.File(historic_h5, "r") as source:
+        historic_shape = source[VIIRS_DSET_NAME].shape
+        historic_dtype = source[VIIRS_DSET_NAME].dtype
+    layout = h5py.VirtualLayout(
+        shape=(historic_shape[0] + len(arrays), *historic_shape[1:]),
+        dtype=historic_dtype,
+    )
+    layout[:historic_shape[0]] = h5py.VirtualSource(
+        str(historic_h5), VIIRS_DSET_NAME, shape=historic_shape
+    )
+    prelim_shape = (len(arrays), *historic_shape[1:])
+    layout[historic_shape[0]:] = h5py.VirtualSource(
+        str(prelim_h5.resolve()), VIIRS_DSET_NAME, shape=prelim_shape
+    )
+    with h5py.File(operational_h5, "w", libver="latest") as output:
+        dataset = output.create_virtual_dataset(VIIRS_DSET_NAME, layout, fillvalue=0)
+        dataset.attrs["historical_source"] = str(historic_h5)
+        dataset.attrs["preliminary_source"] = str(prelim_h5.resolve())
+        dataset.attrs["preliminary_rows"] = len(arrays)
+    combined.to_csv(operational_csv, index=False)
+    logging.info(
+        "Operational VIIRS view contains %d final and %d latest preliminary dekads.",
+        historic_shape[0], len(arrays),
+    )
+    return str(operational_h5), str(operational_csv), str(Path(prelim_download_path))

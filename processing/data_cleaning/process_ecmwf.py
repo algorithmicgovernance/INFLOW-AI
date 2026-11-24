@@ -10,6 +10,7 @@ import argparse
 import logging
 import math
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import urljoin
@@ -30,18 +31,26 @@ from ..config import get_cfg
 
 LOG = logging.getLogger(__name__)
 BASE_URL = "https://gws-access.jasmin.ac.uk/public/tamsat/tamsat_alert/jess_hindcasts/"
-SCHEMA_VERSION = "target-aligned-coarse-relative-10day-v1"
-LEAD_START_DAYS = np.array([0, 10, 20, 30], dtype=np.int16)
-LEAD_END_DAYS = np.array([10, 20, 30, 40], dtype=np.int16)
-MAX_INIT_AGE_DAYS = 6
+FORECAST_2025_URL = "https://gws-access.jasmin.ac.uk/public/tamsat/tamsat_alert/jess_forecasts_2025/"
+FORECAST_RT_URL = "https://gws-access.jasmin.ac.uk/public/tamsat/tamsat_alert/jess_forecasts_rt/"
+SCHEMA_VERSION = "target-aligned-coarse-relative-10day-v2"
+_LEAD_WINDOWS = get_cfg("sources.ecmwf.lead_windows_days", [[0, 10], [10, 20], [20, 30], [30, 40]])
+if len(_LEAD_WINDOWS) != 4 or any(len(window) != 2 for window in _LEAD_WINDOWS):
+    raise ValueError("sources.ecmwf.lead_windows_days must contain exactly four [start, end] pairs")
+LEAD_START_DAYS = np.array([window[0] for window in _LEAD_WINDOWS], dtype=np.int16)
+LEAD_END_DAYS = np.array([window[1] for window in _LEAD_WINDOWS], dtype=np.int16)
+MAX_INIT_AGE_DAYS = int(get_cfg("sources.ecmwf.max_initialization_age_days", 6))
 
 
-def download_ecmwf_hindcasts(base_url=None, download_path=None, max_workers=4, timeout=60):
-    """Download missing NetCDF files; preserve existing nonempty files."""
-    base_url = base_url or get_cfg("sources.ecmwf.base_url", BASE_URL)
-    folder = Path(download_path or Path(get_cfg("paths.downloads.root", "data/downloads")) / "ecmwf")
+def download_ecmwf_files(base_url, download_path, max_workers=None, timeout=None, label="ECMWF"):
+    """Download all missing NetCDF files listed by one ECMWF archive."""
+    folder = Path(download_path)
+    max_workers = int(max_workers or get_cfg("sources.ecmwf.download_workers", 4))
+    timeout = int(timeout or get_cfg("sources.ecmwf.request_timeout_seconds", 60))
+    chunk_bytes = int(get_cfg("sources.ecmwf.download_chunk_mb", 4)) * 1024 * 1024
     folder.mkdir(parents=True, exist_ok=True)
-    response = requests.get(base_url, timeout=timeout, headers={"User-Agent": "INFLOW-AI/1.0"})
+    headers = {"User-Agent": str(get_cfg("sources.ecmwf.user_agent", "INFLOW-AI/1.0"))}
+    response = requests.get(base_url, timeout=timeout, headers=headers)
     response.raise_for_status()
     names = sorted(set(re.findall(r"[A-Za-z0-9_.-]+\.nc\b", response.text)))
     if not names:
@@ -52,29 +61,82 @@ def download_ecmwf_hindcasts(base_url=None, download_path=None, max_workers=4, t
         if destination.exists() and destination.stat().st_size > 0:
             return destination
         partial = folder / f"{name}.part"
-        try:
-            with requests.get(urljoin(base_url, name), stream=True, timeout=timeout) as download:
-                download.raise_for_status()
-                with partial.open("wb") as output:
-                    for chunk in download.iter_content(chunk_size=4 * 1024 * 1024):
-                        if chunk:
-                            output.write(chunk)
-            if partial.stat().st_size == 0:
-                raise RuntimeError(f"Empty download: {name}")
-            partial.replace(destination)
-            return destination
-        finally:
-            partial.unlink(missing_ok=True)
+        retries = int(get_cfg("sources.ecmwf.download_retries", 4))
+        retry_delay = float(get_cfg("sources.ecmwf.retry_delay_seconds", 3))
+        for attempt in range(1, retries + 1):
+            existing_bytes = partial.stat().st_size if partial.exists() else 0
+            request_headers = dict(headers)
+            if existing_bytes:
+                request_headers["Range"] = f"bytes={existing_bytes}-"
+            try:
+                with requests.get(
+                    urljoin(base_url, name), stream=True, timeout=timeout,
+                    headers=request_headers,
+                ) as download:
+                    download.raise_for_status()
+                    resumed = existing_bytes > 0 and download.status_code == 206
+                    mode = "ab" if resumed else "wb"
+                    with partial.open(mode) as output:
+                        for chunk in download.iter_content(chunk_size=chunk_bytes):
+                            if chunk:
+                                output.write(chunk)
+                if partial.stat().st_size == 0:
+                    if bool(get_cfg("sources.ecmwf.skip_empty_remote_files", True)):
+                        LOG.warning("Skipping empty ECMWF archive entry: %s", name)
+                        partial.unlink(missing_ok=True)
+                        return None
+                    raise RuntimeError(f"Empty download: {name}")
+                partial.replace(destination)
+                return destination
+            except (requests.RequestException, OSError) as error:
+                if attempt == retries:
+                    raise RuntimeError(
+                        f"Failed to download {name} after {retries} attempts"
+                    ) from error
+                LOG.warning(
+                    "ECMWF download %s failed on attempt %d/%d; retaining %d partial bytes",
+                    name, attempt, retries, partial.stat().st_size if partial.exists() else 0,
+                )
+                time.sleep(retry_delay * (2 ** (attempt - 1)))
 
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        return list(tqdm(pool.map(get_one, names), total=len(names), desc="Download ECMWF"))
+        downloaded = list(
+            tqdm(pool.map(get_one, names), total=len(names), desc=f"Download {label}")
+        )
+    return [path for path in downloaded if path is not None]
+
+
+def download_ecmwf_hindcasts(base_url=None, download_path=None, max_workers=None, timeout=None):
+    """Backward-compatible hindcast downloader."""
+    root = Path(download_path or get_cfg("paths.downloads.ecmwf", "data/downloads/ecmwf"))
+    return download_ecmwf_files(
+        base_url or get_cfg("sources.ecmwf.hindcast_base_url",
+                            get_cfg("sources.ecmwf.base_url", BASE_URL)),
+        root, max_workers, timeout, "ECMWF hindcasts")
+
+
+def _source_locations(root=None):
+    explicit_root = root is not None
+    root = Path(root or get_cfg("paths.downloads.ecmwf", "data/downloads/ecmwf"))
+    archive_2025 = (root / "forecasts_2025" if explicit_root else
+                    Path(get_cfg("paths.downloads.ecmwf_forecasts_2025",
+                                 root / "forecasts_2025")))
+    archive_rt = (root / "forecasts_rt" if explicit_root else
+                  Path(get_cfg("paths.downloads.ecmwf_forecasts_rt", root / "forecasts_rt")))
+    return [
+        ("hindcast", get_cfg("sources.ecmwf.hindcast_base_url", BASE_URL), root),
+        ("forecast_2025", get_cfg("sources.ecmwf.forecast_2025_base_url", FORECAST_2025_URL),
+         archive_2025),
+        ("forecast_rt", get_cfg("sources.ecmwf.forecast_rt_base_url", FORECAST_RT_URL),
+         archive_rt),
+    ]
 
 
 def _blocks(init, last_valid, product=None):
     """Return four fixed 10-day lead blocks if 40 complete forecast days exist."""
     del product
     init = pd.Timestamp(init).normalize()
-    if init + pd.Timedelta(days=40) > pd.Timestamp(last_valid).normalize():
+    if init + pd.Timedelta(days=int(LEAD_END_DAYS.max())) > pd.Timestamp(last_valid).normalize():
         return []
     return [(init + pd.Timedelta(days=int(start)), init + pd.Timedelta(days=int(end)))
             for start, end in zip(LEAD_START_DAYS, LEAD_END_DAYS)]
@@ -97,7 +159,12 @@ def _run_slices(times, source, file):
 
 
 def _target_periods(product):
-    path = Path(cleaning_utils.get_target_temporal_path(product))
+    operational_path = get_cfg("runtime.operational_target_temporal_path")
+    path = Path(
+        operational_path
+        if product == "viirs" and operational_path
+        else cleaning_utils.get_target_temporal_path(product)
+    )
     if not path.exists():
         raise FileNotFoundError(f"Target temporal CSV not found: {path}")
     frame = pd.read_csv(path)
@@ -116,7 +183,7 @@ def _target_periods(product):
     return periods
 
 
-def _inventory_runs(files, source):
+def _inventory_runs(files, source, source_kind=None):
     """Read only metadata needed to map target periods to forecast runs."""
     runs = []
     for path in tqdm(files, desc="Inventory ECMWF runs"):
@@ -136,12 +203,24 @@ def _inventory_runs(files, source):
             blocks = _blocks(run_times[0], run_times[-1])
             if blocks:
                 runs.append({"init": pd.Timestamp(run_times[0]), "path": path,
-                             "blocks": blocks, "ensemble_size": members})
+                             "blocks": blocks, "ensemble_size": members,
+                             "source_kind": source_kind or source})
     runs.sort(key=lambda item: item["init"])
     duplicate_dates = pd.Series([run["init"] for run in runs]).duplicated()
     if duplicate_dates.any():
         raise ValueError("Duplicate ECMWF initialization dates found across source files")
     return runs
+
+
+def _merge_runs(*inventories):
+    """Merge archives, preferring real-time then 2025 forecasts over hindcasts."""
+    priority = {"hindcast": 0, "forecast_2025": 1, "forecast_rt": 2}
+    by_init = {}
+    for run in (item for inventory in inventories for item in inventory):
+        old = by_init.get(run["init"])
+        if old is None or priority.get(run["source_kind"], 0) > priority.get(old["source_kind"], 0):
+            by_init[run["init"]] = run
+    return sorted(by_init.values(), key=lambda item: item["init"])
 
 
 def _select_runs(periods, runs, max_age_days=MAX_INIT_AGE_DAYS):
@@ -215,12 +294,10 @@ def _backup_path(path):
     return candidate
 
 
-def _same_timeline(hdf, periods, grid, source_file_count):
+def _same_timeline(hdf, periods, grid, source_file_count=None):
     if hdf.attrs.get("schema_version") != SCHEMA_VERSION:
         return False
     if hdf["X"].shape != (len(periods), 4, grid["height"], grid["width"]):
-        return False
-    if int(hdf.attrs.get("source_file_count", -1)) != source_file_count:
         return False
     stored = hdf["target_period_starts"].asstr()[:]
     expected = periods["target_start"].dt.strftime("%Y-%m-%d").to_numpy()
@@ -248,13 +325,17 @@ def _ensure_hdf5(path, periods, selected, grid, product, source, temporal_path,
         hdf.create_dataset("X", shape=(count, 4, grid["height"], grid["width"]),
                            maxshape=(None, 4, grid["height"], grid["width"]),
                            chunks=(1, 1, grid["height"], grid["width"]), dtype="float32",
-                           fillvalue=np.nan, compression="gzip", compression_opts=4, shuffle=True)
+                           fillvalue=np.nan,
+                           compression=get_cfg("sources.ecmwf.hdf5_compression", "gzip"),
+                           compression_opts=int(get_cfg("sources.ecmwf.hdf5_compression_level", 4)),
+                           shuffle=True)
         hdf.create_dataset("target_period_starts", data=periods["target_start"].dt.strftime("%Y-%m-%d"),
                            maxshape=(None,), dtype=string_type)
         hdf.create_dataset("target_period_ends", data=periods["target_end"].dt.strftime("%Y-%m-%d"),
                            maxshape=(None,), dtype=string_type)
         init_times = hdf.create_dataset("init_times", shape=(count,), maxshape=(None,), dtype=string_type)
         source_files = hdf.create_dataset("source_files", shape=(count,), maxshape=(None,), dtype=string_type)
+        source_kinds = hdf.create_dataset("source_kinds", shape=(count,), maxshape=(None,), dtype=string_type)
         ages = hdf.create_dataset("init_age_days", shape=(count,), maxshape=(None,), dtype="int16", fillvalue=-1)
         members = hdf.create_dataset("ensemble_size", shape=(count,), maxshape=(None,), dtype="int16")
         status = hdf.create_dataset("status", shape=(count,), maxshape=(None,), dtype="uint8", fillvalue=2)
@@ -265,6 +346,7 @@ def _ensure_hdf5(path, periods, selected, grid, product, source, temporal_path,
         for row, run in selected.items():
             init_times[row] = run["init"].strftime("%Y-%m-%d")
             source_files[row] = run["path"].name
+            source_kinds[row] = run.get("source_kind", source)
             ages[row] = run["init_age_days"]
             members[row] = run["ensemble_size"]
             status[row] = 0  # selected but not yet processed
@@ -274,6 +356,30 @@ def _ensure_hdf5(path, periods, selected, grid, product, source, temporal_path,
                          source_file_count=source_file_count,
                          crs=grid["crs"], transform=tuple(grid["transform"])[:6],
                          data_revision=0, csv_revision=-1)
+
+
+def _sync_selection(path, selected, source_file_count):
+    """Invalidate only target rows whose selected initialization has changed."""
+    changed = False
+    with h5py.File(path, "r+") as hdf:
+        for row in range(len(hdf["status"])):
+            run = selected.get(row)
+            expected = "" if run is None else run["init"].strftime("%Y-%m-%d")
+            kind = "" if run is None else run.get("source_kind", "hindcast")
+            if hdf["init_times"].asstr()[row] == expected and hdf["source_kinds"].asstr()[row] == kind:
+                continue
+            changed = True
+            hdf["X"][row] = np.nan
+            hdf["init_times"][row] = expected
+            hdf["source_files"][row] = "" if run is None else run["path"].name
+            hdf["source_kinds"][row] = kind
+            hdf["init_age_days"][row] = -1 if run is None else run["init_age_days"]
+            hdf["ensemble_size"][row] = 0 if run is None else run["ensemble_size"]
+            hdf["status"][row] = 2 if run is None else 0
+        hdf.attrs["source_file_count"] = source_file_count
+        if changed:
+            hdf.attrs["data_revision"] = int(hdf.attrs.get("data_revision", 0)) + 1
+    return changed
 
 
 def _process_pending(path, selected, grid):
@@ -352,6 +458,7 @@ def _write_temporal_csv_from_hdf5(hdf_path, csv_path):
         starts = hdf["target_period_starts"].asstr()[:]
         ends = hdf["target_period_ends"].asstr()[:]
         init_times = hdf["init_times"].asstr()[:]
+        source_kinds = hdf["source_kinds"].asstr()[:]
         ages = hdf["init_age_days"][:]
         members = hdf["ensemble_size"][:]
         statuses = hdf["status"][:]
@@ -360,6 +467,7 @@ def _write_temporal_csv_from_hdf5(hdf_path, csv_path):
             available = bool(statuses[index] == 1)
             row = {"date": starts[index], "period_start": starts[index],
                    "period_end": ends[index], "ecmwf_init_time": init_times[index],
+                   "ecmwf_source": source_kinds[index],
                    "ecmwf_init_age_days": int(ages[index]) if available else np.nan,
                    "ecmwf_has_forecast": available,
                    "ecmwf_ensemble_size": int(members[index]) if available else np.nan}
@@ -386,19 +494,26 @@ def _write_temporal_csv_from_hdf5(hdf_path, csv_path):
         hdf.attrs["csv_revision"] = revision
 
 
-def process_ecmwf_hindcasts(download_path=None, output_h5=None, output_csv=None,
-                            target_product=None, skip_download=False, source="hindcast"):
-    """Build target-aligned coarse-grid ECMWF HDF5 and temporal CSV outputs."""
+def process_ecmwf_forecasts(download_path=None, output_h5=None, output_csv=None,
+                            target_product=None, skip_download=False):
+    """Combine hindcasts, the 2025 archive, and live forecasts into aligned outputs."""
     product = cleaning_utils.resolve_target_product(
         target_product or get_cfg("runtime.target_product", "viirs"))
-    folder = Path(download_path or Path(get_cfg("paths.downloads.root", "data/downloads")) / "ecmwf")
-    files = sorted(folder.glob("*.nc"))
-    files = [path for path in files if ("hin" in path.stem.lower()) == (source == "hindcast")]
-    if not files and not skip_download and source == "hindcast":
-        download_ecmwf_hindcasts(download_path=folder)
-        files = [path for path in sorted(folder.glob("*.nc")) if "hin" in path.stem.lower()]
-    if not files:
-        raise FileNotFoundError(f"No {source} NetCDF files in {folder}")
+    locations = _source_locations(download_path)
+    if not skip_download:
+        for kind, url, folder in locations:
+            download_ecmwf_files(url, folder, label=kind.replace("_", " "))
+    source_files = {}
+    for kind, _, folder in locations:
+        files = sorted(folder.glob("*.nc"))
+        if kind == "hindcast":
+            files = [path for path in files if "hin" in path.stem.lower()]
+        else:
+            files = [path for path in files if "hin" not in path.stem.lower()]
+        source_files[kind] = files
+    all_files = [path for files in source_files.values() for path in files]
+    if not all_files:
+        raise FileNotFoundError("No ECMWF hindcast or forecast NetCDF files are available")
 
     output = Path(output_h5 or cleaning_utils.get_target_historic_path("ecmwf_hindcasts.h5", product))
     temporal = Path(output_csv or cleaning_utils.get_target_historic_path(
@@ -406,28 +521,32 @@ def process_ecmwf_hindcasts(download_path=None, output_h5=None, output_csv=None,
     output.parent.mkdir(parents=True, exist_ok=True)
     temporal.parent.mkdir(parents=True, exist_ok=True)
 
-    grid = _common_grid(files[0])
+    grid = _common_grid(all_files[0])
     periods = _target_periods(product)
-    if output.exists():
-        with h5py.File(output, "r") as hdf:
-            complete = (
-                _same_timeline(hdf, periods, grid, len(files))
-                and not np.any(hdf["status"][:] == 0)
-            )
-        if complete:
-            LOG.info("ECMWF HDF5 is complete and unchanged; skipping source inventory")
-            _write_temporal_csv_from_hdf5(output, temporal)
-            return output
-
-    runs = _inventory_runs(files, source)
+    inventories = []
+    for kind, files in source_files.items():
+        if files:
+            source = "hindcast" if kind == "hindcast" else "forecast"
+            inventories.append(_inventory_runs(files, source, kind))
+    runs = _merge_runs(*inventories)
     selected = _select_runs(periods, runs)
     LOG.info("Mapped %d of %d target periods to ECMWF runs on a %dx%d coarse grid",
              len(selected), len(periods), grid["height"], grid["width"])
-    _ensure_hdf5(output, periods, selected, grid, product, source, temporal, len(files))
+    _ensure_hdf5(output, periods, selected, grid, product, "combined", temporal, len(all_files))
+    _sync_selection(output, selected, len(all_files))
     _process_pending(output, selected, grid)
     _write_temporal_csv_from_hdf5(output, temporal)
     LOG.info("ECMWF processing complete: %s and %s", output, temporal)
     return output
+
+
+def process_ecmwf_hindcasts(download_path=None, output_h5=None, output_csv=None,
+                            target_product=None, skip_download=False, source="hindcast"):
+    """Compatibility entry point; now includes archived and real-time forecasts."""
+    if source not in {"hindcast", "all"}:
+        LOG.warning("The source=%s option is deprecated; processing the combined archive", source)
+    return process_ecmwf_forecasts(download_path, output_h5, output_csv,
+                                   target_product, skip_download)
 
 
 def main():
@@ -437,11 +556,12 @@ def main():
     parser.add_argument("--output-csv")
     parser.add_argument("--target-product", choices=["viirs", "modis"])
     parser.add_argument("--skip-download", action="store_true")
-    parser.add_argument("--source", choices=["hindcast", "forecast"], default="hindcast")
+    parser.add_argument("--source", choices=["hindcast", "forecast", "all"], default="all",
+                        help="Deprecated: all archives are always combined")
     arguments = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    process_ecmwf_hindcasts(arguments.download_path, arguments.output_h5, arguments.output_csv,
-                            arguments.target_product, arguments.skip_download, arguments.source)
+    process_ecmwf_forecasts(arguments.download_path, arguments.output_h5, arguments.output_csv,
+                            arguments.target_product, arguments.skip_download)
 
 
 if __name__ == "__main__":

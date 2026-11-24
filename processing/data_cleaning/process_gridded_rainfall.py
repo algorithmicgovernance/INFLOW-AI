@@ -17,19 +17,11 @@ from processing.data_cleaning.download_tamsat.tamsat_download_extract_api import
 # Import data manipulation libraries
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
 
 # Import geospatial libraries
-import geopandas as gpd
 import rasterio
-from rasterio.mask import mask as rasterio_mask
 from rasterio.transform import from_origin
-from rasterio.warp import reproject, Resampling
 import netCDF4 as nc
-import xarray as xr
-
-# Import client libraries
-import wget
 
 # Import compression libraries
 import h5py
@@ -54,35 +46,6 @@ GR_RAINFALL_TEMPORAL_PATH = cleaning_utils.get_target_historic_path("gridded_rai
 GR_RAINFALL_H5_PATH = cleaning_utils.get_target_historic_path("gridded_rainfall.h5")
 SAMPLE_TIF_FOLDER = get_cfg("paths.downloads.inundation_modis", "data/downloads/inundation_masks_modis")
 CATCHMENTS_PATH = get_cfg("paths.maps.catchments", "data/maps/inflow_catchments/INFLOW_all_cmts.shp")
-
-
-def reproject_rainfall(rainfall_ds, target_crs, target_transform, target_width, target_height):
-    """
-    Repoject and resample rainfall data.
-
-    Parameters:
-        rainfall_ds (array): NetCDF file with gridded rainfall data.
-        target_crs (str): Target CRS for reprojection.
-        target_transform (str): Target transformation for reprojection.
-        target_width (float): Target width for reprojection.
-        target_height (float): Target height for reprojection.
-    """
-    rainfall_data = rainfall_ds.read(1)  # Read the first band (rainfall data)
-    rainfall_transform = rainfall_ds.transform
-    rainfall_crs = rainfall_ds.crs
-
-    # Reproject the rainfall data to match the target CRS, dimensions, and resolution
-    reprojected_rainfall = np.empty((target_height, target_width), dtype=rainfall_data.dtype)
-    reproject(
-        source=rainfall_data,
-        destination=reprojected_rainfall,
-        src_transform=rainfall_transform,
-        src_crs=rainfall_crs,
-        dst_transform=target_transform,
-        dst_crs=target_crs,
-        resampling=Resampling.bilinear  # Bilinear resampling for continuous data (adjust if needed)
-    )
-    return reprojected_rainfall
 
 
 def extract_date_from_filename(filename):
@@ -162,11 +125,6 @@ def _validate_rainfall_netcdf_file(netcdf_path):
         raise RuntimeError(f"Invalid rainfall NetCDF file '{netcdf_path}': {e}") from e
 
 
-def _get_latest_valid_rainfall_netcdf(extract_folder):
-    """Return the most recent readable rainfall NetCDF from extract folder."""
-    return _get_valid_rainfall_netcdf(extract_folder)
-
-
 def _rainfall_netcdf_date_range(netcdf_path):
     with nc.Dataset(netcdf_path, mode="r") as ds:
         time_var = ds.variables["time"]
@@ -209,73 +167,6 @@ def _get_valid_rainfall_netcdf(extract_folder, required_start=None, required_end
         "No valid extracted rainfall NetCDF file found. Validation errors: "
         + " | ".join(errors)
     )
-
-
-def get_historic_dates(data_path=GR_RAINFALL_TEMPORAL_PATH):
-    """
-    Get list of historic dates from pre-downloaded data.
-
-    Parameters:
-        data_path (str): Directory path of pre-downloaded temporal data.
-    """
-    try:
-        gridded_rainfall_temporal = pd.read_csv(data_path)
-        if "date" in gridded_rainfall_temporal.columns:
-            historic_dates = gridded_rainfall_temporal["date"].astype(str).tolist()
-        else:
-            historic_dates = gridded_rainfall_temporal.index.astype(str).tolist()
-        return historic_dates
-    except FileNotFoundError:
-        logging.error(f"File not found: {data_path}")
-        return []
-
-
-def download_new_gridded_rainfall(download_folder, target_product=None):
-    """
-    Download gridded rainfall data for dates not already downloaded.
-
-    Parameters:
-        download_folder (str): Directory folder to save downloaded TIF files.
-    """
-    target_product = cleaning_utils.resolve_target_product(target_product)
-    download_path_full = os.path.join(os.getcwd(), download_folder)
-    current_date_str = datetime.now().strftime("%Y-%m-%d")
-    historic_dates = get_historic_dates()
-    has_historic_temporal = bool(historic_dates)
-
-    if has_historic_temporal:
-        last_date = historic_dates[-1]  # Get the last downloaded date
-        last_date = datetime.strptime(last_date, "%Y-%m-%d").strftime("%Y-%m-%d")  # Ensure the format is YYYY-MM-DD
-    else:
-        # Bootstrap from the selected inundation target product timeline.
-        last_date = cleaning_utils.get_target_start_date(target_product=target_product)
-
-    new_dates = cleaning_utils.get_dates_of_interest(
-        start_date_str=last_date,
-        end_date_str=current_date_str,
-        target_product=target_product,
-    )
-
-    local_product_path = os.path.join(os.getcwd(), GR_RAINFALL_DOWNLOAD_PATH)
-    local_dates = cleaning_utils.get_local_download_dates(local_product_path)
-    missing_dates = [d for d in new_dates if d not in local_dates]
-
-    if missing_dates:
-        download_range = [missing_dates[0], missing_dates[-1]]
-        download_gridded_rainfall(download_range, download_path_full)
-        local_dates = cleaning_utils.get_local_download_dates(local_product_path)
-
-    if not local_dates:
-        raise RuntimeError(f"No downloaded daily rainfall files found in {local_product_path}")
-    required_start, required_end = min(local_dates), max(local_dates)
-    try:
-        _get_valid_rainfall_netcdf(EXTRACTED_DOMAIN_PATH, required_start, required_end)
-    except RuntimeError:
-        # As in the moisture pipeline, extraction always spans the complete
-        # cached archive so a clean rebuild cannot accidentally use only the
-        # latest incremental download.
-        extract_gridded_rainfall([required_start, required_end], download_folder)
-        _get_valid_rainfall_netcdf(EXTRACTED_DOMAIN_PATH, required_start, required_end)
 
 
 def group_dates_by_decade(dates, target_product='modis'):
@@ -401,92 +292,10 @@ def crop_historic_data(file_path, temporal_data_path):
             )
 
 
-def process_new_gridded_rainfall(rainfall_dekads_folder,
-                                 sample_tif_folder=SAMPLE_TIF_FOLDER,
-                                 catchments_path=CATCHMENTS_PATH):
-    """
-    Process newly downloaded gridded rainfall data.
-
-    Parameters:
-        sample_tif_folder (str): Folder with sample inundation tif file for extracting boundaries.
-        rainfall_dekads_folder (str): Folder with extracted rainfall dekads.
-    """
-    # List rainfall files and filter only the valid .tif files
-    rainfall_dekads_files = [f for f in os.listdir(rainfall_dekads_folder) if f.endswith('.tif') and not f.endswith('(1).tif')]
-
-    if not rainfall_dekads_files:
-        logging.info("No grouped rainfall GeoTIFFs available to process yet.")
-        return np.empty((0, *cleaning_utils.MASK_REGIONS_REF_SHAPE)), []
-
-    # Sort the list of valid tif files based on their extracted date
-    rainfall_files_sorted = sorted(rainfall_dekads_files, key=lambda f: extract_date_from_filename(f))
-    rainfall_dekads_files_new = glob.glob(os.path.join(rainfall_dekads_folder, '*'))
-    
-    # Extract valid dates
-    rainfall_dates = [extract_date_from_filename(f) for f in rainfall_dekads_files_new]
-    rainfall_dates = [d for d in rainfall_dates if d is not None]
-
-    # Create a DataFrame for alignment
-    dates = pd.to_datetime([date.strftime('%Y-%m-%d') for date in rainfall_dates])
-    dates_df = pd.DataFrame({'date': dates}).sort_values('date').reset_index()
-    sorted_dates = list(dates_df['date'])
-    rainfall_df = pd.DataFrame({'rainfall_file': rainfall_dekads_files_new, 'rainfall_date': rainfall_dates}).sort_values('rainfall_date').reset_index()
-
-    # Merge the two dataframes to ensure every target date has a corresponding rainfall date
-    aligned_df = pd.merge(dates_df, rainfall_df, left_on='date', right_on='rainfall_date', how='left').sort_values('rainfall_date').reset_index()
-
-    # Check for missing dates
-    missing_rainfall_dates = aligned_df[aligned_df['rainfall_file'].isna()]['date']
-    if not missing_rainfall_dates.empty:
-        print(f"Warning: Missing rainfall data for {len(missing_rainfall_dates)} dates.")
-
-    # Align rainfall files
-    aligned_rainfall_files = aligned_df['rainfall_file'].tolist()
-
-    return aligned_rainfall_files, sorted_dates
-
-
-def process_single_rainfall_tif(rainfall_tif_path, catchments):
-    """Align and mask a single rainfall GeoTIFF onto the shared reference grid."""
-    with rasterio.open(rainfall_tif_path) as rainfall_ds:
-        resampled_rainfall = cleaning_utils.align_and_mask_raster_to_reference_grid(
-            src=rainfall_ds,
-            mask_gdf=catchments,
-            src_band=1,
-            dst_fill=0,
-            resampling=Resampling.bilinear,
-        )
-    if resampled_rainfall is None:
-        raise RuntimeError(f"Reprojection returned None for file: {rainfall_tif_path}")
-    return resampled_rainfall.astype(np.float32, copy=False)
-
-
 def _date_strings_from_hdf(hdf):
     if "dates" not in hdf:
         return []
     return list(hdf["dates"].asstr()[:])
-
-
-def _migrate_legacy_hdf_dates(hdf_path, temporal_path):
-    """Add dates to a legacy HDF5 only when its CSV is an exact-length match."""
-    if not os.path.exists(hdf_path) or not os.path.exists(temporal_path):
-        return False
-    frame = pd.read_csv(temporal_path)
-    if "date" not in frame:
-        return False
-    dates = pd.to_datetime(frame["date"], errors="coerce")
-    if dates.isna().any() or dates.duplicated().any() or not dates.is_monotonic_increasing:
-        return False
-    with h5py.File(hdf_path, "r+") as hdf:
-        if "rainfall" not in hdf or hdf["rainfall"].shape[0] != len(dates):
-            return False
-        if "dates" not in hdf:
-            hdf.create_dataset(
-                "dates", data=np.asarray(dates.dt.strftime("%Y-%m-%d"), dtype=object),
-                maxshape=(None,), dtype=h5py.string_dtype("utf-8"),
-            )
-        hdf.attrs["target_product"] = cleaning_utils.resolve_target_product(None)
-    return True
 
 
 def _rainfall_temporal_row(date_str, rainfall_2d, regions_gdf):
@@ -502,44 +311,6 @@ def _rainfall_temporal_row(date_str, rainfall_2d, regions_gdf):
             float(np.nansum(region_area)) / valid_cells if valid_cells > 0 else np.nan
         )
     return row
-
-
-def _append_rainfall_periods(hdf_path, pending, catchments, regions_gdf, target_product):
-    """Append complete, chronologically ordered periods and return CSV rows."""
-    rows = []
-    Path(hdf_path).parent.mkdir(parents=True, exist_ok=True)
-    with h5py.File(hdf_path, "a") as hdf:
-        rainfall_dset = hdf.get("rainfall")
-        dates_dset = hdf.get("dates")
-        for tif_path, date_str in tqdm(pending, desc="Streaming rainfall into H5"):
-            rainfall_2d = process_single_rainfall_tif(tif_path, catchments)
-            if rainfall_dset is None:
-                rainfall_dset = hdf.create_dataset(
-                    "rainfall", shape=(0, *rainfall_2d.shape),
-                    maxshape=(None, *rainfall_2d.shape),
-                    chunks=(1, *rainfall_2d.shape), dtype=np.float32,
-                    compression="gzip", compression_opts=4, shuffle=True,
-                )
-            if dates_dset is None:
-                dates_dset = hdf.create_dataset(
-                    "dates", shape=(0,), maxshape=(None,),
-                    dtype=h5py.string_dtype("utf-8"),
-                )
-            if tuple(rainfall_dset.shape[1:]) != tuple(rainfall_2d.shape):
-                raise ValueError(
-                    f"Rainfall grid changed from {rainfall_dset.shape[1:]} to {rainfall_2d.shape}"
-                )
-            index = rainfall_dset.shape[0]
-            rainfall_dset.resize(index + 1, axis=0)
-            dates_dset.resize(index + 1, axis=0)
-            rainfall_dset[index] = rainfall_2d
-            dates_dset[index] = date_str
-            rows.append(_rainfall_temporal_row(date_str, rainfall_2d, regions_gdf))
-        hdf.attrs["target_product"] = target_product
-        hdf.attrs["units"] = "mm"
-        hdf.attrs["aggregation"] = "mean daily rainfall within complete target period"
-        hdf.flush()
-    return rows
 
 
 def _write_csv_atomic(frame, temporal_path):

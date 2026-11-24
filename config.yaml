@@ -1,5 +1,10 @@
 sources:
+  # Final maps are the immutable historical/training record. Preliminary maps
+  # are overlaid only for operational forecasts and never enter that record.
   viirs_base_url: "https://gws-access.jasmin.ac.uk/public/tamsat/INFLOW/south-sudan_flood-maps/v2.0/final/"
+  viirs_final_base_url: "https://gws-access.jasmin.ac.uk/public/tamsat/INFLOW/south-sudan_flood-maps/v2.0/final/"
+  viirs_prelim_base_url: "https://gws-access.jasmin.ac.uk/public/tamsat/INFLOW/south-sudan_flood-maps/v2.0/prelim/"
+  viirs_prelim_catalogue_url: "https://gws-access.jasmin.ac.uk/public/tamsat/INFLOW/south-sudan_flood-maps/v2.0/prelim/prelim_versions.csv"
   modis_base_url: "https://data.earthobservation.vam.wfp.org/public-share/sudd_wetland_monitoring/modis_flood_masks/ssdmask"
   rainfall_url: "https://gws-access.jasmin.ac.uk/public/tamsat/INFLOW/rainfall/rfe_time-series/combined/rfe_19830101-present_Lake-Victoria.csv"
   lake_levels:
@@ -15,12 +20,27 @@ sources:
     dmi: "https://www.cpc.ncep.noaa.gov/products/international/ocean_monitoring/indian/IODMI/mnth.ersstv5.clim19912020.dmi_current.txt"
   ecmwf:
     base_url: "https://gws-access.jasmin.ac.uk/public/tamsat/tamsat_alert/jess_hindcasts/"
+    hindcast_base_url: "https://gws-access.jasmin.ac.uk/public/tamsat/tamsat_alert/jess_hindcasts/"
+    forecast_2025_base_url: "https://gws-access.jasmin.ac.uk/public/tamsat/tamsat_alert/jess_forecasts_2025/"
+    forecast_rt_base_url: "https://gws-access.jasmin.ac.uk/public/tamsat/tamsat_alert/jess_forecasts_rt/"
+    download_workers: 4
+    request_timeout_seconds: 60
+    download_retries: 4
+    retry_delay_seconds: 3
+    download_chunk_mb: 4
+    user_agent: "INFLOW-AI/1.0"
+    skip_empty_remote_files: true
+    max_initialization_age_days: 6
+    lead_windows_days: [[0, 10], [10, 20], [20, 30], [30, 40]]
+    hdf5_compression: "gzip"
+    hdf5_compression_level: 4
 
 paths:
   downloads:
     root: "data/downloads"
     inundation_modis: "data/downloads/inundation_masks_modis"
     inundation_viirs: "data/downloads/inundation_masks_viirs_v2"
+    inundation_viirs_prelim: "data/downloads/inundation_masks_viirs_prelim"
     teleconnections: "data/downloads/teleconnections"
     tamsat: "data/downloads/tamsat"
     lake_levels: "data/downloads/lake_levels"
@@ -30,6 +50,8 @@ paths:
     tamsat_sm_daily: "data/downloads/tamsat/soil_moisture/data/v2.3.1/daily"
     tamsat_sm_dekads: "data/downloads/tamsat/soil_moisture/dekads"
     ecmwf: "data/downloads/ecmwf"
+    ecmwf_forecasts_2025: "data/downloads/ecmwf/forecasts_2025"
+    ecmwf_forecasts_rt: "data/downloads/ecmwf/forecasts_rt"
   historic:
     root: "data/historic"
     inundation_h5: "data/historic/viirs-aligned/inundation_viirs.h5"
@@ -51,6 +73,11 @@ paths:
     gridded_rainfall_cumulative_h5: "data/historic/viirs-aligned/gridded_rainfall_cumulative.h5"
     ecmwf_hindcasts_temporal: "data/historic/viirs-aligned/ecmwf_hindcasts_temporal.csv"
     ecmwf_hindcasts_h5: "data/historic/viirs-aligned/ecmwf_hindcasts.h5"
+  operational:
+    root: "data/operational"
+    viirs_h5: "data/operational/inundation_viirs.h5"
+    viirs_prelim_h5: "data/operational/inundation_viirs_prelim.h5"
+    viirs_temporal: "data/operational/inundation_viirs_temporal.csv"
   maps:
     catchments: "data/maps/inflow_catchments/INFLOW_all_cmts.shp"
     admin0: "data/maps/admin_boundaries/ssd_admbnda_adm0_imwg_nbs_20230829.shp"
@@ -79,11 +106,25 @@ runtime:
       - "HYDROWEB_LAKES_OPE/HYDROWEB_LAKES_OPE/hydroprd_L_albert.txt"
   teleconnections:
     min_date: "2002-07-01"
+  viirs:
+    use_preliminary_for_deployment: true
+    request_retries: 3
+    retry_delay_seconds: 2
+    request_timeout_seconds: 120
 
 # Shared by temporal forecasts and spatial ConvLSTM outputs.
 forecast:
   horizon_periods: 6
   horizon_months: 2
+  date_generation_buffer_days: 120
+  interval_percent: 80
+
+outputs:
+  root: "predictions"
+  forecast_performance_csv: "predictions/forecast_performance.csv"
+  temporal_csv_filename: "temporal_predictions.csv"
+  model_report_filename: "model_performance.json"
+  graph_dpi: 220
 
 spatial_training:
   model_path: "model/spatial_model.keras"
@@ -100,11 +141,120 @@ spatial_training:
   backup_frequency_batches: 500
   mixed_precision: true
   filters: [32]
+  kernel_size: [3, 3]
+  activation: "relu"
+  output_activation: "sigmoid"
+  optimizer: "adam"
+  learning_rate: 0.001
+  loss: "mean_squared_error"
+  metrics: ["mae"]
   max_epochs: 200
   validation_fraction: 0.2
   early_stopping_patience: 10
   early_stopping_min_delta: 1.0e-5
+  checkpoint_monitor: "val_loss"
+  checkpoint_mode: "min"
+  reduce_lr_factor: 0.5
+  reduce_lr_patience: 5
+  minimum_learning_rate: 1.0e-6
   seed: 42
+
+basin_attributes_processing:
+  enabled: false
+  overwrite_existing: false
+  basin_path: "data/maps/hydroatlas/inflow-basin-atlas.gpkg"
+  catchments_path: "data/maps/inflow_catchments/INFLOW_all_cmts.shp"
+  output_path: "data/maps/basin_attributes.npy"
+  metadata_path: "data/maps/basin_attributes.metadata.json"
+  preprocessing_path: "data/maps/basin_attributes.preprocessing.npz"
+  id_column: "HYBAS_ID"
+  pca_min_explained_variance_ratio: 0.01
+  minimum_components: 1
+  rasterize_all_touched: false
+  numeric_imputation_strategy: "median"
+  attributes:
+    - "DIST_SINK"
+    - "DIST_MAIN"
+    - "glc_pc_u15"
+    - "wet_pc_sg1"
+    - "wet_pc_s04"
+    - "wet_pc_sg2"
+    - "wet_pc_ug1"
+    - "inu_pc_slt"
+    - "wet_pc_u04"
+    - "wet_pc_ug2"
+    - "inu_pc_smx"
+    - "inu_pc_ult"
+    - "soc_th_sav"
+    - "inu_pc_umx"
+    - "lka_pc_use"
+    - "dis_m3_pmn"
+    - "wet_pc_u01"
+    - "lkv_mc_usu"
+    - "glc_pc_u02"
+    - "tmp_dc_smn"
+    - "tmp_dc_s12"
+    - "gwt_cm_sav"
+    - "tmp_dc_s11"
+    - "pop_ct_usu"
+    - "inu_pc_smn"
+    - "lka_pc_sse"
+    - "soc_th_uav"
+    - "gdp_ud_usu"
+    - "dis_m3_pyr"
+    - "tmp_dc_s02"
+    - "tmp_dc_s01"
+    - "glc_pc_u20"
+    - "tmp_dc_s03"
+    - "ele_mt_sav"
+    - "ele_mt_smx"
+    - "ele_mt_smn"
+    - "inu_pc_umn"
+    - "riv_tc_usu"
+    - "tmp_dc_syr"
+    - "ria_ha_usu"
+    - "tmp_dc_s10"
+    - "slp_dg_sav"
+    - "tmp_dc_s08"
+    - "riv_tc_ssu"
+    - "ria_ha_ssu"
+    - "wet_pc_s03"
+    - "tmp_dc_s09"
+    - "pre_mm_s02"
+    - "wet_pc_s01"
+    - "tmp_dc_s04"
+    - "cmi_ix_s02"
+    - "glc_cl_smj_15"
+    - "tbi_cl_smj_9"
+    - "tec_cl_smj_74"
+    - "tbi_cl_smj_7"
+    - "wet_cl_smj_4"
+    - "lit_cl_smj_8"
+    - "clz_cl_smj_17"
+    - "clz_cl_smj_18"
+    - "fec_cl_smj_522"
+    - "cls_cl_smj_123"
+    - "fmh_cl_smj_10"
+    - "tec_cl_smj_43"
+    - "tec_cl_smj_52"
+    - "cls_cl_smj_122"
+    - "tec_cl_smj_53"
+    - "glc_cl_smj_3"
+    - "glc_cl_smj_9"
+    - "pnv_cl_smj_9"
+
+spatial_prediction:
+  enabled: true
+  output_subdirectory: "spatial_predictions"
+  static_dir: "data/maps"
+  population_centres_path: "data/maps/population_centres/hotosm_ssd_populated_places_points_shp.shp"
+  hospitals_path: "data/maps/exposure/hospitals.csv"
+  schools_path: "data/maps/exposure/schools.csv"
+  catchments_path: "data/maps/inflow_catchments/INFLOW_all_cmts.shp"
+  minimum_population: 10000
+  map_dpi: 300
+  patch_border: 4
+  prediction_batch_size: 32
 
 spatial_validation:
   enabled: true

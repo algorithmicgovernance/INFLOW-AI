@@ -23,14 +23,21 @@ from model.ablation.temporal_deployment import (
     update_temporal_sources_for_best_model,
     write_best_model_metadata,
 )
-from explanations.shap_explanations import export_lead_waterfall_plots
 from explanations.feature_history import export_feature_history_plots
-from processing.data_cleaning.process_ecmwf import process_ecmwf_hindcasts
+from processing.data_cleaning.process_ecmwf import process_ecmwf_forecasts
+from processing.config import get_cfg
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-FORECAST_PERFORMANCE_CSV = Path("predictions") / "forecast_performance.csv"
+FORECAST_PERFORMANCE_CSV = Path(get_cfg(
+    "outputs.forecast_performance_csv", "predictions/forecast_performance.csv"
+))
+FORECAST_INTERVAL_PERCENT = int(get_cfg("forecast.interval_percent", 80))
+LOWER_BOUND_FRACTION = f"lower_bound_{FORECAST_INTERVAL_PERCENT}_fraction"
+LOWER_BOUND_KM2 = f"lower_bound_{FORECAST_INTERVAL_PERCENT}_km2"
+UPPER_BOUND_FRACTION = f"upper_bound_{FORECAST_INTERVAL_PERCENT}_fraction"
+UPPER_BOUND_KM2 = f"upper_bound_{FORECAST_INTERVAL_PERCENT}_km2"
 
 
 def _target_display_name(target_column: str) -> str:
@@ -47,7 +54,9 @@ def _target_display_name(target_column: str) -> str:
 def _prediction_output_dir(target_column: str, future_dates: list[pd.Timestamp]) -> Path:
     start = future_dates[0].strftime("%Y-%m-%d")
     end = future_dates[-1].strftime("%Y-%m-%d")
-    return Path("predictions") / f"temporal_predictions_{target_column}_{start}_to_{end}"
+    return Path(get_cfg("outputs.root", "predictions")) / (
+        f"temporal_predictions_{target_column}_{start}_to_{end}"
+    )
 
 
 def _forecast_window_end_date(date: pd.Timestamp, target_product: str) -> pd.Timestamp:
@@ -122,7 +131,7 @@ def export_model_report(bundle) -> Path:
             "pca_path": row.get("dataset_pca_path"),
         },
     }
-    output_path = output_dir / "model_performance.json"
+    output_path = output_dir / get_cfg("outputs.model_report_filename", "model_performance.json")
     output_path.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     return output_path
 
@@ -143,10 +152,10 @@ def export_csv(bundle) -> Path:
             "actual_km2": history_area,
             "predicted_fraction": np.nan,
             "predicted_km2": np.nan,
-            "lower_bound_80_fraction": np.nan,
-            "lower_bound_80_km2": np.nan,
-            "upper_bound_80_fraction": np.nan,
-            "upper_bound_80_km2": np.nan,
+            LOWER_BOUND_FRACTION: np.nan,
+            LOWER_BOUND_KM2: np.nan,
+            UPPER_BOUND_FRACTION: np.nan,
+            UPPER_BOUND_KM2: np.nan,
         }
     )
     forecast_df = pd.DataFrame(
@@ -156,15 +165,15 @@ def export_csv(bundle) -> Path:
             "actual_km2": np.nan,
             "predicted_fraction": bundle.predicted_raw,
             "predicted_km2": predicted_area,
-            "lower_bound_80_fraction": bundle.lower_raw,
-            "lower_bound_80_km2": lower_area,
-            "upper_bound_80_fraction": bundle.upper_raw,
-            "upper_bound_80_km2": upper_area,
+            LOWER_BOUND_FRACTION: bundle.lower_raw,
+            LOWER_BOUND_KM2: lower_area,
+            UPPER_BOUND_FRACTION: bundle.upper_raw,
+            UPPER_BOUND_KM2: upper_area,
         }
     )
     combined = pd.concat([history_df, forecast_df], ignore_index=True)
 
-    output_path = output_dir / "temporal_predictions.csv"
+    output_path = output_dir / get_cfg("outputs.temporal_csv_filename", "temporal_predictions.csv")
     combined.to_csv(output_path, index=False)
     return output_path
 
@@ -193,10 +202,10 @@ def update_forecast_performance_csv(bundle) -> Path:
             "model_version": [model_version] * len(bundle.future_dates),
             "predicted_fraction": np.asarray(bundle.predicted_raw, dtype=np.float64),
             "predicted_km2": np.asarray(predicted_km2, dtype=np.float64),
-            "lower_bound_80_fraction": np.asarray(bundle.lower_raw, dtype=np.float64),
-            "lower_bound_80_km2": np.asarray(lower_km2, dtype=np.float64),
-            "upper_bound_80_fraction": np.asarray(bundle.upper_raw, dtype=np.float64),
-            "upper_bound_80_km2": np.asarray(upper_km2, dtype=np.float64),
+            LOWER_BOUND_FRACTION: np.asarray(bundle.lower_raw, dtype=np.float64),
+            LOWER_BOUND_KM2: np.asarray(lower_km2, dtype=np.float64),
+            UPPER_BOUND_FRACTION: np.asarray(bundle.upper_raw, dtype=np.float64),
+            UPPER_BOUND_KM2: np.asarray(upper_km2, dtype=np.float64),
             "actual_fraction": np.nan,
             "error_fraction": np.nan,
             "actual_km2": np.nan,
@@ -211,10 +220,10 @@ def update_forecast_performance_csv(bundle) -> Path:
         "model_version",
         "predicted_fraction",
         "predicted_km2",
-        "lower_bound_80_fraction",
-        "lower_bound_80_km2",
-        "upper_bound_80_fraction",
-        "upper_bound_80_km2",
+        LOWER_BOUND_FRACTION,
+        LOWER_BOUND_KM2,
+        UPPER_BOUND_FRACTION,
+        UPPER_BOUND_KM2,
         "actual_fraction",
         "error_fraction",
         "actual_km2",
@@ -304,7 +313,7 @@ def export_graphs(bundle) -> list[Path]:
             edgecolor="none",
             color="#d62728",
             alpha=0.18,
-            label="80% confidence interval",
+            label=f"{FORECAST_INTERVAL_PERCENT}% confidence interval",
         )
         ax.axvline(bundle.origin_date, color="#222", linestyle=":", linewidth=1.0)
 
@@ -320,7 +329,7 @@ def export_graphs(bundle) -> list[Path]:
         plt.xticks(rotation=45)
 
         output_path = output_dir / f"prediction_{suffix}.png"
-        fig.savefig(output_path, dpi=220, bbox_inches="tight")
+        fig.savefig(output_path, dpi=int(get_cfg("outputs.graph_dpi", 220)), bbox_inches="tight")
         plt.close(fig)
         paths.append(output_path)
 
@@ -410,7 +419,7 @@ def export_graphs(bundle) -> list[Path]:
                     fill_upper,
                     color="#d62728",
                     alpha=0.18,
-                    label="80% confidence interval",
+                    label=f"{FORECAST_INTERVAL_PERCENT}% confidence interval",
                 )
         else:
             color = cmap(index / max(len(unique_years) - 1, 1))
@@ -432,7 +441,7 @@ def export_graphs(bundle) -> list[Path]:
     ax.legend(loc="best")
 
     comparison_path = output_dir / "prediction_year_by_year_comparison.png"
-    fig.savefig(comparison_path, dpi=220, bbox_inches="tight")
+    fig.savefig(comparison_path, dpi=int(get_cfg("outputs.graph_dpi", 220)), bbox_inches="tight")
     plt.close(fig)
     paths.append(comparison_path)
 
@@ -441,12 +450,12 @@ def export_graphs(bundle) -> list[Path]:
 
 def main() -> None:
     try:
-        logging.info("Processing ECMWF hindcasts...")
-        process_ecmwf_hindcasts()
-        logging.info("ECMWF hindcasts processed successfully")
-
         best_row = load_best_model_row()
         update_temporal_sources_for_best_model(best_row)
+        logging.info("Updating ECMWF hindcasts and operational forecasts...")
+        process_ecmwf_forecasts()
+        logging.info("ECMWF forecast data processed successfully")
+
         runtime_row = retrain_best_model_on_available_data(best_row)
         metadata_path = write_best_model_metadata(runtime_row)
         logging.info("Best temporal model metadata written to %s", metadata_path)
@@ -460,10 +469,18 @@ def main() -> None:
 
         csv_path = export_csv(bundle)
         model_report_path = export_model_report(bundle)
-        shap_paths = export_lead_waterfall_plots(
-            runtime_row,
-            _prediction_output_dir(bundle.target_column, bundle.future_dates),
-        )
+        shap_paths = []
+        try:
+            from explanations.shap_explanations import export_lead_waterfall_plots
+            shap_paths = export_lead_waterfall_plots(
+                runtime_row,
+                _prediction_output_dir(bundle.target_column, bundle.future_dates),
+            )
+        except Exception as exc:
+            logging.warning(
+                "SHAP explanations could not be generated; forecast outputs will continue: %s",
+                exc,
+            )
         feature_history_paths = export_feature_history_plots(
             runtime_row,
             _prediction_output_dir(bundle.target_column, bundle.future_dates),
@@ -487,6 +504,10 @@ def main() -> None:
         logging.info("Forecast performance ledger written to %s", performance_path)
         for graph_path in graph_paths:
             logging.info("Graph written to %s", graph_path)
+
+        from model.make_spatial_prediction import run_operational_spatial_analysis
+        spatial_paths = run_operational_spatial_analysis(csv_path)
+        logging.info("Spatial prediction outputs written: %d", len(spatial_paths))
 
     except Exception as exc:
         logging.exception("Error occurred while exporting temporal predictions: %s", exc)

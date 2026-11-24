@@ -192,6 +192,14 @@ def update_temporal_sources_for_best_model(row: dict[str, Any]) -> None:
     product = str(row["inundation_product"]).strip().lower()
     if product == "viirs":
         process_inundation_viirs.update_inundation()
+        if bool(get_cfg("runtime.viirs.use_preliminary_for_deployment", True)):
+            operational_h5, operational_csv, operational_downloads = (
+                process_inundation_viirs.prepare_operational_inundation()
+            )
+            cfg = get_config()
+            cfg.setdefault("runtime", {})["operational_target_temporal_path"] = operational_csv
+            cfg.setdefault("paths", {}).setdefault("historic", {})["viirs_h5"] = operational_h5
+            cfg["paths"].setdefault("downloads", {})["inundation_viirs"] = operational_downloads
     elif product == "modis":
         process_inundation_modis.update_inundation()
     else:
@@ -437,8 +445,12 @@ def _reconstruct_future_raw_predictions(
         point_raw = max(point_raw, 0.0)
         sample_raw = np.maximum(sample_raw, 0.0)
         point_predictions.append(point_raw)
-        lower_bounds.append(float(np.quantile(sample_raw, 0.10)))
-        upper_bounds.append(float(np.quantile(sample_raw, 0.90)))
+        interval = float(get_cfg("forecast.interval_percent", 80)) / 100.0
+        if not 0.0 < interval < 1.0:
+            raise ValueError("forecast.interval_percent must be between 0 and 100")
+        tail = (1.0 - interval) / 2.0
+        lower_bounds.append(float(np.quantile(sample_raw, tail)))
+        upper_bounds.append(float(np.quantile(sample_raw, 1.0 - tail)))
 
         history_raw.append(point_raw)
         prior_sample_predictions = sample_raw
@@ -485,7 +497,9 @@ def generate_temporal_forecast(row: dict[str, Any]) -> TemporalForecastBundle:
     latest_features = eligible_features.iloc[-1]
     origin_date = target_anchor_date
 
-    forecast_end = origin_date + timedelta(days=120)
+    forecast_end = origin_date + timedelta(days=int(get_cfg(
+        "forecast.date_generation_buffer_days", 120
+    )))
     future_date_strings = cleaning_utils.get_dates_of_interest(
         origin_date.strftime("%Y-%m-%d"),
         forecast_end.strftime("%Y-%m-%d"),

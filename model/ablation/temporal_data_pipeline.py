@@ -196,14 +196,21 @@ def _build_temporal_feature_table(
     if not target_file_candidates:
         target_file_candidates = [p for p in csv_files if "inundation" in p.stem]
 
-    target_df = _read_temporal_file(target_file_candidates[0])
+    operational_target = get_cfg("runtime.operational_target_temporal_path")
+    target_path = (
+        Path(str(operational_target))
+        if target_product == "viirs" and operational_target
+        else target_file_candidates[0]
+    )
+    target_df = _read_temporal_file(target_path)
     if target_column not in target_df.columns:
-        raise ValueError(f"Missing configured target column '{target_column}' in {target_file_candidates[0]}")
+        raise ValueError(f"Missing configured target column '{target_column}' in {target_path}")
     target_series = target_df[["date", target_column]].rename(columns={target_column: "target_raw"})
 
     if merged_dates is None:
         raise RuntimeError("No temporal date index could be built from aligned temporal CSV files.")
 
+    merged_dates = merged_dates.merge(target_series[["date"]], on="date", how="outer")
     work = merged_dates.merge(target_series, on="date", how="left")
     for frame in feature_frames:
         work = work.merge(frame, on="date", how="left")

@@ -17,9 +17,19 @@ from processing.data_cleaning.process_ecmwf import (
     SCHEMA_VERSION,
     _blocks,
     _ensure_hdf5,
+    _merge_runs,
     _run_slices,
     _select_runs,
 )
+
+
+def test_live_forecast_replaces_same_date_from_older_archive():
+    init = pd.Timestamp("2026-01-01")
+    old = {"init": init, "path": Path("archive.nc"), "source_kind": "forecast_2025"}
+    live = {"init": init, "path": Path("live.nc"), "source_kind": "forecast_rt"}
+    merged = _merge_runs([old], [live])
+    assert len(merged) == 1
+    assert merged[0]["path"].name == "live.nc"
 
 
 def test_hindcast_runs_are_split_on_gaps_not_calendar_years():

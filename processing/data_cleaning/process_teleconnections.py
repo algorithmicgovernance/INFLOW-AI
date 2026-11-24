@@ -4,9 +4,6 @@ import pandas as pd
 import numpy as np
 from functools import reduce
 
-# Import logging libraries
-import loguru
-
 # Import cleaning utils
 from .. import cleaning_utils
 from ..config import get_cfg
@@ -92,44 +89,6 @@ def align_teleconnections_with_dates(teleconnections, dates_list):
 
     return teleconnections
 
-
-def handle_missing_values(teleconnections):
-    """
-    Handle missing values in teleconnections data by applying linear interpolation.
-    """
-    for col in teleconnections.columns:
-        # Create a mask for missing values in the current column
-        missing_mask = teleconnections[col].isnull()
-        group_id = (missing_mask != missing_mask.shift()).cumsum()
-
-        # Filter out the groups that are not missing and count consecutive missing values
-        consecutive_missing_counts = (
-            teleconnections[missing_mask]
-            .assign(group_id=group_id[missing_mask])
-            .groupby('group_id')
-            .size()
-        )
-
-        consecutive_missing_counts = consecutive_missing_counts.reset_index(name='count')
-        end_missing_streak = consecutive_missing_counts.iloc[-1]['count'] if not consecutive_missing_counts.empty else 0
-
-        # Impute missing values for the current column using linear interpolation
-        teleconnections_filled = teleconnections.copy()
-        teleconnections_filled[col] = teleconnections[col].interpolate(method='linear')
-
-        # Count how many consecutive rows are missing from the end in the current column
-        last_streak = teleconnections[col].isnull().iloc[::-1].cumsum().max()
-
-        # If there's a streak of missing values at the end, revert those rows back to NaN
-        if last_streak > 0:
-            last_indices = teleconnections_filled.index[-end_missing_streak:]
-            teleconnections_filled.loc[last_indices, col] = np.nan
-
-        # Update the original DataFrame with the filled values
-        teleconnections[col] = teleconnections_filled[col]
-
-    return teleconnections
-    
 
 def interpolate_missing(teleconnections):
     """

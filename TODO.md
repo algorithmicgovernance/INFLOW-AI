@@ -25,18 +25,17 @@
 - [x] Determine why there are two base models and what they do
 - [x] Add transformer model to ablation testing
 - [x] Replace current VIIRS data with data processed by Ross
+- [x] Add ECMWF forecasts from 2025-2026 to training h5, ensure live prediction files can be processed by the operational forecast
 - [ ] Ensure operational forecast uses data from the prelim folder
-- [ ] Add ECMWF forecasts from 2025-2026 to training h5, ensure live prediction files can be processed by the operational forecast
-
 - [x] Add GloFAS data
 - [x] Improve efficiency of data extraction and training for spatial model
 - [x] Retrain spatial model with VIIRS, ECMWF, and GloFAS
-- [ ] Retrain spatial model and validate using VIIRS data
+- [x] Retrain spatial model and validate using VIIRS data
 - [ ] Train spatial model again on full data set and deploy
-- [ ] Ensure exposure layer is still used and reported on for the spatial model
-- [ ] Ensure all pipeline parameters are input in the config and not hardcoded
-- [ ] Look for any duplicated files and dead code
-- [ ] Update README to accurately descibe current pipeline (ablation, deployment, and config)
+- [x] Ensure exposure layer is still used and reported on for the spatial model
+- [x] Ensure all pipeline parameters are input in the config and not hardcoded
+- [x] Look for any duplicated files and dead code
+- [x] Update README to accurately descibe current pipeline (ablation, deployment, and config)
 
 ## Major Changes
 - [ ] Implement call to LLM with access to White Nile/South Sudan flooding literature to explain model results and interpret data qualitatively
