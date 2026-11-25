@@ -26,6 +26,7 @@ from model.ablation.temporal_deployment import (
 from explanations.feature_history import export_feature_history_plots
 from processing.data_cleaning.process_ecmwf import process_ecmwf_forecasts
 from processing.config import get_cfg
+from model.data_preflight import audit_temporal_data
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -451,10 +452,30 @@ def export_graphs(bundle) -> list[Path]:
 def main() -> None:
     try:
         best_row = load_best_model_row()
+        if bool(get_cfg("data_preflight.enabled", True)):
+            logging.info("Auditing local data before operational source updates...")
+            audit_temporal_data(
+                str(best_row["inundation_product"]),
+                mode="deployment_initial",
+                include_ecmwf=bool(get_cfg(
+                    "ablation.pipeline.optional_feature_blocks.include_ecmwf_hindcasts", True
+                )),
+                fail_on_error=False,
+            )
         update_temporal_sources_for_best_model(best_row)
         logging.info("Updating ECMWF hindcasts and operational forecasts...")
         process_ecmwf_forecasts()
         logging.info("ECMWF forecast data processed successfully")
+
+        if bool(get_cfg("data_preflight.enabled", True)):
+            audit_temporal_data(
+                str(best_row["inundation_product"]),
+                mode="deployment",
+                include_ecmwf=bool(get_cfg(
+                    "ablation.pipeline.optional_feature_blocks.include_ecmwf_hindcasts", True
+                )),
+                fail_on_error=True,
+            )
 
         runtime_row = retrain_best_model_on_available_data(best_row)
         metadata_path = write_best_model_metadata(runtime_row)

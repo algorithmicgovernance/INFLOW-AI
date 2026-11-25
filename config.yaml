@@ -50,6 +50,7 @@ paths:
     tamsat_sm_daily: "data/downloads/tamsat/soil_moisture/data/v2.3.1/daily"
     tamsat_sm_dekads: "data/downloads/tamsat/soil_moisture/dekads"
     ecmwf: "data/downloads/ecmwf"
+    ecmwf_inventory_cache: "data/downloads/ecmwf/inventory_cache.json"
     ecmwf_forecasts_2025: "data/downloads/ecmwf/forecasts_2025"
     ecmwf_forecasts_rt: "data/downloads/ecmwf/forecasts_rt"
   historic:
@@ -126,6 +127,21 @@ outputs:
   model_report_filename: "model_performance.json"
   graph_dpi: 220
 
+# Fail-fast completeness checks run before model fitting or deployment inference.
+data_preflight:
+  enabled: true
+  minimum_target_rows: 100
+  maximum_target_missing_fraction: 0.0
+  minimum_date_coverage_fraction: 0.95
+  maximum_numeric_missing_fraction: 0.15
+  ecmwf:
+    minimum_available_fraction_after_first: 0.95
+    maximum_trailing_missing_periods: 1
+  report_paths:
+    ablation: "model/ablation/data_preflight.json"
+    deployment_initial: "predictions/data_preflight_before_updates.json"
+    deployment: "predictions/data_preflight.json"
+
 spatial_training:
   model_path: "model/spatial_model.keras"
   elevation_path: "data/maps/elevation.npy"
@@ -158,6 +174,22 @@ spatial_training:
   reduce_lr_patience: 5
   minimum_learning_rate: 1.0e-6
   seed: 42
+
+spatial_fine_tuning:
+  source_model_path: "model/spatial_model.keras"
+  output_model_path: "model/spatial_model.keras"
+  learning_rate: 0.0001
+  max_epochs: 50
+  early_stopping_patience: 8
+  early_stopping_min_delta: 1.0e-5
+  reduce_lr_factor: 0.5
+  reduce_lr_patience: 4
+  minimum_learning_rate: 1.0e-7
+  recent_training_periods: 0
+  freeze_convlstm_layers: false
+  backup_dir: ""
+  backup_frequency_batches: 500
+  run_validation: true
 
 basin_attributes_processing:
   enabled: false

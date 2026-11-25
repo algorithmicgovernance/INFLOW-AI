@@ -80,6 +80,13 @@ size is stored per initialization because archives can contain different member
 counts. Existing initialization selections are checked before expensive
 extraction and reprojection.
 
+NetCDF run metadata is cached incrementally at
+`paths.downloads.ecmwf_inventory_cache`. Each entry is keyed by file path,
+size, modification time and archive type. Unchanged files are not reopened on
+later runs, while new or changed files are inspected and added to the cache.
+The cache is saved after every inspected file, so interrupting inventory loses
+at most the file currently being read.
+
 Processed target-aligned products are written under:
 
 ```text
@@ -133,6 +140,13 @@ Run the experiment grid defined in `config.yaml`:
 ```bash
 python3 -m model.ablation.run_temporal_ablation
 ```
+
+Before creating any model, a mandatory data preflight prints the target-series
+length and date range plus row coverage and numeric missingness for every
+aligned CSV. It also checks the corresponding gridded HDF5 products. Enabled
+ECMWF features receive additional availability, consecutive-gap and trailing-
+gap checks. Unsafe inputs stop the complete experiment grid before training;
+the detailed report is written to `model/ablation/data_preflight.json`.
 
 When `ablation.enabled: true` and complete experiment lists are present, the
 configuration takes precedence over command-line defaults.
@@ -218,6 +232,30 @@ the published model only when the configured validation metric improves, while
 can therefore resume without replacing the best published model with a worse
 epoch.
 
+### Fine-tuning an existing spatial model
+
+Fine-tuning reuses an already trained model and updates its weights at a lower
+learning rate; it does not rebuild the ConvLSTM from random initialization:
+
+```bash
+python3 -m model.spatial.fine_tune_convlstm
+```
+
+The source model must already match the configured 10-channel input and
+`forecast.horizon_periods` output architecture. Changing the number of channels,
+patch dimensions or forecast horizons requires full training. Fine-tuning uses
+the same chronological validation split as training and writes to a temporary
+candidate checkpoint. The published model is replaced only when the candidate
+improves the configured validation metric beyond `early_stopping_min_delta`.
+Interrupted runs retain resumable state while leaving the published model
+untouched.
+
+Use `spatial_fine_tuning.recent_training_periods: 0` for all historical
+training periods, or set a positive number to focus updates on the most recent
+training periods. Source/output paths, learning rate, epoch ceiling, layer
+freezing, early stopping, learning-rate reduction, backup frequency and
+post-tuning validation are all configured under `spatial_fine_tuning`.
+
 When `spatial_validation.enabled: true`, successful training automatically
 compares the ConvLSTM with:
 
@@ -257,10 +295,13 @@ python3 __main__.py
 
 The operational sequence is:
 
-1. list and download missing ECMWF hindcast, 2025 archive and real-time files;
-2. update the target-aligned ECMWF HDF5 and temporal CSV;
-3. load the selected temporal experiment metadata;
-4. update current temporal source data and the selected inundation product;
+1. load the selected temporal experiment metadata and report current data
+   completeness before attempting updates;
+2. update current temporal sources and construct the final-plus-preliminary
+   operational inundation view;
+3. download missing ECMWF hindcast, 2025 archive and real-time files, then
+   update the target-aligned ECMWF HDF5 and temporal CSV;
+4. run the strict data preflight and stop if required inputs remain incomplete;
 5. rebuild the selected lead-specific preprocessing and retrain that model on
    all currently available labelled history;
 6. recursively reconstruct transformed targets into raw inundation fractions;
@@ -354,12 +395,26 @@ control historical acquisition.
   stage-two feature-block removals.
 - `ablation.artifacts.base_dir` controls saved experiment artifacts.
 
+### `data_preflight`
+
+This section controls minimum timeline length, target and predictor missingness,
+date coverage, ECMWF availability after its first forecast, allowable trailing
+ECMWF gaps, and JSON report paths. Relaxing these thresholds permits more
+imputation and should be treated as an explicit modelling decision.
+
 ### `spatial_training`
 
 This section controls static input paths, sequence and patch dimensions,
 sampling density, batch size, HDF5 cache, architecture, optimizer, loss,
 maximum epochs, chronological validation fraction, mixed precision, checkpoint
 monitoring, early stopping and learning-rate reduction.
+
+### `spatial_fine_tuning`
+
+This section controls the existing source model, publication path, reduced
+learning rate, optional recent-period training window, optional ConvLSTM layer
+freezing, epoch ceiling, early stopping, checkpoint backup and validation after
+fine-tuning.
 
 ### `spatial_validation` and `spatial_prediction`
 

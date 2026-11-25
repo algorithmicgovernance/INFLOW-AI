@@ -9,6 +9,8 @@ model/testing/
 *.ipynb
 __pycache__/
 .ipynb_checkpoints/
+model/ablation/data_preflight.json
+predictions/data_preflight*.json
 
 # Deployment artifacts required by the model
 !model/ablation/artifacts/scalers/*.pkl

@@ -6,6 +6,8 @@ import h5py
 import numpy as np
 import pandas as pd
 import rasterio
+import xarray as xr
+import pytest
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
@@ -17,10 +19,60 @@ from processing.data_cleaning.process_ecmwf import (
     SCHEMA_VERSION,
     _blocks,
     _ensure_hdf5,
+    _inventory_runs,
     _merge_runs,
+    _normalized_times,
     _run_slices,
     _select_runs,
 )
+
+
+def test_archived_forecast_placeholder_times_are_reconstructed_from_filename():
+    expected = pd.date_range("2025-01-01", periods=47, freq="D")
+    malformed = expected.to_numpy().copy()
+    malformed[13:] = np.datetime64("1900-01-01")
+    dataset = xr.Dataset(coords={"time": malformed})
+    result = _normalized_times(
+        dataset, "forecast", Path("sfc-24ac-ecmwf-20250101.nc")
+    )
+    assert result.equals(expected)
+
+
+def test_forecast_time_repair_rejects_nonplaceholder_disagreement():
+    expected = pd.date_range("2025-01-01", periods=47, freq="D")
+    malformed = expected.to_numpy().copy()
+    malformed[5] = np.datetime64("2025-01-08")
+    malformed[13:] = np.datetime64("1900-01-01")
+    dataset = xr.Dataset(coords={"time": malformed})
+    with pytest.raises(ValueError, match="inconsistent non-placeholder times"):
+        _normalized_times(dataset, "forecast", Path("sfc-24ac-ecmwf-20250101.nc"))
+
+
+def test_ecmwf_inventory_reuses_unchanged_file_cache(tmp_path, monkeypatch):
+    source = tmp_path / "sfc-24ac-ecmwf-20250101.nc"
+    cache = tmp_path / "inventory.json"
+    times = pd.date_range("2025-01-01", periods=47, freq="D")
+    xr.Dataset(
+        data_vars={"tp": (("time", "number", "latitude", "longitude"),
+                          np.zeros((47, 1, 2, 2), dtype=np.float32))},
+        coords={
+            "time": times,
+            "number": [1],
+            "latitude": [1.0, 0.0],
+            "longitude": [30.0, 31.0],
+        },
+    ).to_netcdf(source)
+
+    first = _inventory_runs([source], "forecast", "forecast_2025", cache_path=cache)
+    assert len(first) == 1
+    assert cache.exists()
+
+    monkeypatch.setattr(
+        "processing.data_cleaning.process_ecmwf.xr.open_dataset",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("cache miss")),
+    )
+    second = _inventory_runs([source], "forecast", "forecast_2025", cache_path=cache)
+    assert second[0]["init"] == first[0]["init"]
 
 
 def test_live_forecast_replaces_same_date_from_older_archive():

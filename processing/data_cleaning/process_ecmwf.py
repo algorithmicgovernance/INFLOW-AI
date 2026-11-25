@@ -7,6 +7,7 @@ common 1.5-degree grid; temporal and regional features are derived from HDF5.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import math
 import re
@@ -158,6 +159,103 @@ def _run_slices(times, source, file):
     return [slice(int(start), int(end)) for start, end in zip(boundaries[:-1], boundaries[1:])]
 
 
+def _normalized_times(dataset, source, path):
+    """Return validated times, repairing the known 1900 forecast placeholders.
+
+    Some archived operational files contain valid daily fields but encode a
+    suffix of their time coordinate as zero hours since 1900. Forecast files
+    have exactly one daily sequence identified by their filename, so that
+    suffix can be reconstructed without guessing. Any non-placeholder value
+    that disagrees with the expected sequence remains a hard failure.
+    """
+    times = pd.DatetimeIndex(pd.to_datetime(dataset.time.values))
+    if times.is_monotonic_increasing and not times.has_duplicates:
+        return times
+    if source != "forecast":
+        raise ValueError(f"Time must be sorted and unique: {path.name}")
+
+    match = re.search(r"(20\d{6})", path.stem)
+    if not match:
+        raise ValueError(f"Cannot identify forecast initialization date in {path.name}")
+    init = pd.Timestamp(match.group(1))
+    expected = pd.date_range(init, periods=len(times), freq="D")
+    placeholders = times < init
+    valid_positions = np.flatnonzero(~placeholders)
+    if not len(valid_positions) or times[0] != init:
+        raise ValueError(f"Forecast time coordinate does not begin at {init.date()}: {path.name}")
+    if not np.array_equal(times[valid_positions].values, expected[valid_positions].values):
+        raise ValueError(f"Forecast contains inconsistent non-placeholder times: {path.name}")
+    if not placeholders.any():
+        raise ValueError(f"Time must be sorted and unique: {path.name}")
+    LOG.warning(
+        "Reconstructed %d placeholder timestamps in %s from initialization %s",
+        int(placeholders.sum()), path.name, init.date(),
+    )
+    return pd.DatetimeIndex(expected)
+
+
+INVENTORY_CACHE_VERSION = 1
+
+
+def _inventory_cache_path():
+    return Path(get_cfg(
+        "paths.downloads.ecmwf_inventory_cache",
+        Path(get_cfg("paths.downloads.ecmwf", "data/downloads/ecmwf")) / "inventory_cache.json",
+    ))
+
+
+def _load_inventory_cache(path):
+    path = Path(path)
+    if not path.exists():
+        return {"version": INVENTORY_CACHE_VERSION, "files": {}}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        LOG.warning("Ignoring unreadable ECMWF inventory cache %s: %s", path, error)
+        return {"version": INVENTORY_CACHE_VERSION, "files": {}}
+    if payload.get("version") != INVENTORY_CACHE_VERSION or not isinstance(payload.get("files"), dict):
+        LOG.info("Rebuilding incompatible ECMWF inventory cache: %s", path)
+        return {"version": INVENTORY_CACHE_VERSION, "files": {}}
+    return payload
+
+
+def _write_inventory_cache(path, payload):
+    """Atomically persist progress so an interrupted inventory can resume."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    temporary.replace(path)
+
+
+def _cached_runs(entry, path):
+    return [
+        {
+            "init": pd.Timestamp(run["init"]),
+            "path": path,
+            "blocks": [
+                (pd.Timestamp(start), pd.Timestamp(end))
+                for start, end in run["blocks"]
+            ],
+            "ensemble_size": int(run["ensemble_size"]),
+            "source_kind": str(run["source_kind"]),
+        }
+        for run in entry.get("runs", [])
+    ]
+
+
+def _serialize_runs(runs):
+    return [
+        {
+            "init": run["init"].isoformat(),
+            "blocks": [[start.isoformat(), end.isoformat()] for start, end in run["blocks"]],
+            "ensemble_size": int(run["ensemble_size"]),
+            "source_kind": str(run["source_kind"]),
+        }
+        for run in runs
+    ]
+
+
 def _target_periods(product):
     operational_path = get_cfg("runtime.operational_target_temporal_path")
     path = Path(
@@ -183,28 +281,62 @@ def _target_periods(product):
     return periods
 
 
-def _inventory_runs(files, source, source_kind=None):
+def _inventory_runs(files, source, source_kind=None, cache_path=None):
     """Read only metadata needed to map target periods to forecast runs."""
+    source_kind = source_kind or source
+    cache_path = Path(cache_path or _inventory_cache_path())
+    cache = _load_inventory_cache(cache_path)
     runs = []
+    hits = 0
+    inspected = 0
     for path in tqdm(files, desc="Inventory ECMWF runs"):
+        path = Path(path)
+        stat = path.stat()
+        key = str(path.resolve())
+        entry = cache["files"].get(key)
+        fingerprint_matches = (
+            entry is not None
+            and entry.get("size") == stat.st_size
+            and entry.get("mtime_ns") == stat.st_mtime_ns
+            and entry.get("source") == source
+            and entry.get("source_kind") == source_kind
+        )
+        if fingerprint_matches:
+            runs.extend(_cached_runs(entry, path))
+            hits += 1
+            continue
+
         with xr.open_dataset(path) as dataset:
             required = {"tp", "time", "number", "latitude", "longitude"}
             missing = required.difference(dataset.variables)
             if missing:
                 raise ValueError(f"{path.name} missing {sorted(missing)}")
-            times = pd.DatetimeIndex(pd.to_datetime(dataset.time.values))
+            times = _normalized_times(dataset, source, path)
             members = int(dataset.sizes["number"])
-        if not times.is_monotonic_increasing or times.has_duplicates:
-            raise ValueError(f"Time must be sorted and unique: {path.name}")
+        file_runs = []
         for run_slice in _run_slices(times, source, path):
             run_times = times[run_slice]
             if not len(run_times):
                 continue
             blocks = _blocks(run_times[0], run_times[-1])
             if blocks:
-                runs.append({"init": pd.Timestamp(run_times[0]), "path": path,
-                             "blocks": blocks, "ensemble_size": members,
-                             "source_kind": source_kind or source})
+                file_runs.append({"init": pd.Timestamp(run_times[0]), "path": path,
+                                  "blocks": blocks, "ensemble_size": members,
+                                  "source_kind": source_kind})
+        runs.extend(file_runs)
+        cache["files"][key] = {
+            "size": stat.st_size,
+            "mtime_ns": stat.st_mtime_ns,
+            "source": source,
+            "source_kind": source_kind,
+            "runs": _serialize_runs(file_runs),
+        }
+        _write_inventory_cache(cache_path, cache)
+        inspected += 1
+    LOG.info(
+        "ECMWF inventory: %d cached files, %d new or changed files inspected; cache=%s",
+        hits, inspected, cache_path,
+    )
     runs.sort(key=lambda item: item["init"])
     duplicate_dates = pd.Series([run["init"] for run in runs]).duplicated()
     if duplicate_dates.any():
@@ -395,7 +527,9 @@ def _process_pending(path, selected, grid):
     with h5py.File(path, "r+") as hdf:
         for source_path, rows in tqdm(by_file.items(), desc="Process ECMWF target forecasts"):
             with xr.open_dataset(source_path) as dataset:
-                precipitation = dataset["tp"]
+                source = "hindcast" if rows[0][1].get("source_kind") == "hindcast" else "forecast"
+                normalized_times = _normalized_times(dataset, source, source_path)
+                precipitation = dataset["tp"].assign_coords(time=normalized_times)
                 latitudes = dataset.latitude.values
                 longitudes = dataset.longitude.values
                 for row, run in rows:

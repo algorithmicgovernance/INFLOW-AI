@@ -1,4 +1,9 @@
-from model.spatial.train_convlstm import _patch_starts, _sample_index
+from model.spatial.train_convlstm import (
+    _improved,
+    _patch_starts,
+    _sample_index,
+    _validate_fine_tuning_model,
+)
 from model.make_spatial_prediction import validate_spatial_model_contract
 import pytest
 
@@ -37,3 +42,24 @@ def test_spatial_model_contract_rejects_legacy_single_map_output():
     })()
     with pytest.raises(ValueError, match="not the six-horizon checkpoint"):
         validate_spatial_model_contract(model, 6)
+
+
+def test_fine_tuning_requires_existing_six_horizon_contract():
+    compatible = type("Model", (), {
+        "input_shape": (None, 6, 64, 64, 10),
+        "output_shape": (None, 6, 64, 64, 1),
+    })()
+    _validate_fine_tuning_model(compatible, 6, 64, 6)
+
+    legacy = type("Model", (), {
+        "input_shape": (None, 6, 64, 64, 10),
+        "output_shape": (None, 64, 64, 1),
+    })()
+    with pytest.raises(ValueError, match="Architecture changes require full retraining"):
+        _validate_fine_tuning_model(legacy, 6, 64, 6)
+
+
+def test_fine_tuning_only_publishes_meaningful_validation_improvement():
+    assert _improved(0.09, 0.10, "min", 0.001)
+    assert not _improved(0.0995, 0.10, "min", 0.001)
+    assert _improved(0.91, 0.90, "max", 0.001)

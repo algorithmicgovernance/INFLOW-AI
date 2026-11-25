@@ -4,10 +4,10 @@ Run from the project root after preparing the configured target-product data:
 
     python3 -m model.spatial.train_convlstm
 
-The model consumes the same five channels as ``model.make_spatial_prediction``:
-inundation, rainfall, soil moisture, elevation, and basin attributes. Historic
-grids are streamed from HDF5 by batch, so the full space-time cube is never
-expanded in memory.
+The model consumes the same ten channels as ``model.make_spatial_prediction``:
+inundation, rainfall, soil moisture, elevation, basin attributes, four ECMWF
+forecast windows, and GloFAS. Historic grids are streamed from HDF5 by batch,
+so the full space-time cube is never expanded in memory.
 """
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ import json
 import logging
 import random
 import threading
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -265,7 +266,45 @@ def _build_model(
     return model
 
 
-def train(output: str | None = None) -> Path:
+def _compile_fine_tuning_model(tf, model, learning_rate: float, freeze_convlstm: bool):
+    for layer in model.layers:
+        if isinstance(layer, tf.keras.layers.ConvLSTM2D):
+            layer.trainable = not freeze_convlstm
+    optimizer_name = str(get_cfg("spatial_training.optimizer", "adam")).lower()
+    optimizer = tf.keras.optimizers.get(optimizer_name)
+    optimizer.learning_rate = float(learning_rate)
+    model.compile(
+        optimizer=optimizer,
+        loss=str(get_cfg("spatial_training.loss", "mean_squared_error")),
+        metrics=list(get_cfg("spatial_training.metrics", ["mae"])),
+    )
+    return model
+
+
+def _validate_fine_tuning_model(model, sequence_length, patch_size, forecast_horizon):
+    expected_input = (None, sequence_length, patch_size, patch_size, len(CHANNEL_NAMES))
+    expected_output = (None, forecast_horizon, patch_size, patch_size, 1)
+    if tuple(model.input_shape) != expected_input or tuple(model.output_shape) != expected_output:
+        raise ValueError(
+            "Fine-tuning requires a model already using the configured spatial contract. "
+            f"Expected input {expected_input} and output {expected_output}; got "
+            f"input {tuple(model.input_shape)} and output {tuple(model.output_shape)}. "
+            "Architecture changes require full retraining."
+        )
+
+
+def _metric_value(metrics: dict, monitor: str) -> float:
+    key = monitor[4:] if monitor.startswith("val_") else monitor
+    if key not in metrics:
+        raise KeyError(f"Fine-tuning monitor '{monitor}' is not available in {sorted(metrics)}")
+    return float(metrics[key])
+
+
+def _improved(candidate: float, baseline: float, mode: str, min_delta: float) -> bool:
+    return candidate < baseline - min_delta if mode == "min" else candidate > baseline + min_delta
+
+
+def train(output: str | None = None, fine_tune_from: str | None = None) -> Path:
     try:
         import tensorflow as tf
     except ImportError as exc:
@@ -273,7 +312,6 @@ def train(output: str | None = None) -> Path:
 
     product = cleaning_utils.resolve_target_product(get_cfg("runtime.target_product", "viirs"))
     paths = _paths(product, output)
-    total_times, height, width = _validate_inputs(paths)
     sequence_length = int(get_cfg("spatial_training.sequence_length", 6))
     forecast_horizon = resolve_forecast_horizon_periods()
     patch_size = int(get_cfg("spatial_training.patch_size", 64))
@@ -281,8 +319,10 @@ def train(output: str | None = None) -> Path:
     patches_per_timestep = int(get_cfg("spatial_training.patches_per_timestep", 16))
     batch_size = int(get_cfg("spatial_training.batch_size", 2))
     hdf5_cache_mb = int(get_cfg("spatial_training.hdf5_cache_mb", 64))
+    fine_tuning = fine_tune_from is not None
     max_epochs = int(get_cfg(
-        "spatial_training.max_epochs", get_cfg("spatial_training.epochs", 200)
+        "spatial_fine_tuning.max_epochs" if fine_tuning else "spatial_training.max_epochs",
+        50 if fine_tuning else get_cfg("spatial_training.epochs", 200),
     ))
     validation_fraction = float(get_cfg("spatial_training.validation_fraction", 0.2))
     seed = int(get_cfg("spatial_training.seed", 42))
@@ -295,14 +335,33 @@ def train(output: str | None = None) -> Path:
     tf.random.set_seed(seed)
     if bool(get_cfg("spatial_training.mixed_precision", False)):
         tf.keras.mixed_precision.set_global_policy("mixed_float16")
+    source_model = None
+    model = None
+    if fine_tuning:
+        source_model = Path(str(fine_tune_from))
+        if not source_model.exists():
+            raise FileNotFoundError(f"Spatial model to fine-tune does not exist: {source_model}")
+        model = tf.keras.models.load_model(source_model, compile=False)
+        _validate_fine_tuning_model(model, sequence_length, patch_size, forecast_horizon)
+        model = _compile_fine_tuning_model(
+            tf,
+            model,
+            float(get_cfg("spatial_fine_tuning.learning_rate", 1.0e-4)),
+            bool(get_cfg("spatial_fine_tuning.freeze_convlstm_layers", False)),
+        )
+    total_times, height, width = _validate_inputs(paths)
     first_target = sequence_length
     split_time = int(round(total_times * (1.0 - validation_fraction)))
     last_target_exclusive = total_times - forecast_horizon + 1
     train_target_end = split_time - forecast_horizon + 1
     if train_target_end <= first_target or split_time >= last_target_exclusive:
         raise RuntimeError("Not enough time periods for the configured chronological split.")
+    recent_periods = int(get_cfg("spatial_fine_tuning.recent_training_periods", 0)) if fine_tuning else 0
+    fine_tune_start = (
+        max(first_target, train_target_end - recent_periods) if recent_periods > 0 else first_target
+    )
     train_samples = _sample_index(
-        range(first_target, train_target_end), height, width, patch_size, stride,
+        range(fine_tune_start, train_target_end), height, width, patch_size, stride,
         patches_per_timestep=patches_per_timestep, seed=seed,
     )
     validation_samples = _sample_index(
@@ -321,24 +380,53 @@ def train(output: str | None = None) -> Path:
     )
 
     LOG.info(
-        "Training %s ConvLSTM: %d periods, %d future leads, %d train patches, "
+        "%s %s ConvLSTM: %d periods, %d future leads, %d train patches, "
         "%d validation patches, grid=%dx%d",
-        product.upper(), total_times, forecast_horizon, len(train_samples),
+        "Fine-tuning" if fine_tuning else "Training", product.upper(), total_times,
+        forecast_horizon, len(train_samples),
         len(validation_samples), height, width,
     )
-    model = _build_model(tf, sequence_length, patch_size, filters, forecast_horizon)
     paths.model.parent.mkdir(parents=True, exist_ok=True)
-    configured_backup_dir = str(get_cfg("spatial_training.backup_dir", "")).strip()
+    if not fine_tuning:
+        model = _build_model(tf, sequence_length, patch_size, filters, forecast_horizon)
+
+    backup_key = "spatial_fine_tuning.backup_dir" if fine_tuning else "spatial_training.backup_dir"
+    configured_backup_dir = str(get_cfg(backup_key, "")).strip()
     backup_dir = Path(configured_backup_dir) if configured_backup_dir else (
-        paths.model.parent / f".{paths.model.stem}_training_backup"
+        paths.model.parent / f".{paths.model.stem}_{'fine_tuning' if fine_tuning else 'training'}_backup"
     )
     monitor = str(get_cfg("spatial_training.checkpoint_monitor", "val_loss"))
     monitor_mode = str(get_cfg("spatial_training.checkpoint_mode", "min"))
+    checkpoint_path = paths.model
+    baseline_metric = None
+    if fine_tuning:
+        baseline_metrics = model.evaluate(validation_data, verbose=0, return_dict=True)
+        baseline_metric = _metric_value(baseline_metrics, monitor)
+        checkpoint_path = paths.model.with_name(f".{paths.model.stem}_fine_tune_candidate.keras")
+        LOG.info("Fine-tuning baseline %s=%.8f", monitor, baseline_metric)
+    patience_key = (
+        "spatial_fine_tuning.early_stopping_patience"
+        if fine_tuning else "spatial_training.early_stopping_patience"
+    )
+    min_delta_key = (
+        "spatial_fine_tuning.early_stopping_min_delta"
+        if fine_tuning else "spatial_training.early_stopping_min_delta"
+    )
+    reduce_factor_key = (
+        "spatial_fine_tuning.reduce_lr_factor" if fine_tuning else "spatial_training.reduce_lr_factor"
+    )
+    reduce_patience_key = (
+        "spatial_fine_tuning.reduce_lr_patience" if fine_tuning else "spatial_training.reduce_lr_patience"
+    )
+    min_lr_key = (
+        "spatial_fine_tuning.minimum_learning_rate"
+        if fine_tuning else "spatial_training.minimum_learning_rate"
+    )
     callbacks = [
-        # This is the only published model artifact. It is replaced solely when
-        # validation loss improves.
+        # Fine-tuning writes a candidate; full training writes the published
+        # checkpoint directly. Both retain only validation improvements.
         tf.keras.callbacks.ModelCheckpoint(
-            paths.model,
+            checkpoint_path,
             monitor=monitor,
             mode=monitor_mode,
             save_best_only=True,
@@ -349,22 +437,27 @@ def train(output: str | None = None) -> Path:
         # a candidate model and is deleted automatically after successful fit.
         tf.keras.callbacks.BackupAndRestore(
             backup_dir=str(backup_dir),
-            save_freq=int(get_cfg("spatial_training.backup_frequency_batches", 100)),
+            save_freq=int(get_cfg(
+                "spatial_fine_tuning.backup_frequency_batches"
+                if fine_tuning else "spatial_training.backup_frequency_batches",
+                100,
+            )),
             double_checkpoint=True,
             delete_checkpoint=True,
         ),
         tf.keras.callbacks.EarlyStopping(
             monitor=monitor,
-            patience=int(get_cfg("spatial_training.early_stopping_patience", 10)),
-            min_delta=float(get_cfg("spatial_training.early_stopping_min_delta", 1.0e-5)),
+            patience=int(get_cfg(patience_key, 8 if fine_tuning else 10)),
+            min_delta=float(get_cfg(min_delta_key, 1.0e-5)),
+            baseline=baseline_metric,
             restore_best_weights=True,
             verbose=1,
         ),
         tf.keras.callbacks.ReduceLROnPlateau(
             monitor=monitor,
-            factor=float(get_cfg("spatial_training.reduce_lr_factor", 0.5)),
-            patience=int(get_cfg("spatial_training.reduce_lr_patience", 5)),
-            min_lr=float(get_cfg("spatial_training.minimum_learning_rate", 1.0e-6)), verbose=1,
+            factor=float(get_cfg(reduce_factor_key, 0.5)),
+            patience=int(get_cfg(reduce_patience_key, 4 if fine_tuning else 5)),
+            min_lr=float(get_cfg(min_lr_key, 1.0e-7 if fine_tuning else 1.0e-6)), verbose=1,
         ),
     ]
     try:
@@ -373,20 +466,49 @@ def train(output: str | None = None) -> Path:
         )
     except KeyboardInterrupt:
         LOG.warning(
-            "Training interrupted. The best completed validation checkpoint remains at %s; "
+            "Training interrupted. The published model remains at %s and the best "
+            "candidate is at %s; "
             "rerun the command to resume from %s.",
             paths.model,
+            checkpoint_path,
             backup_dir,
         )
         raise
     finally:
         train_data.close()
         validation_data.close()
-    # Reload the published checkpoint so downstream validation always evaluates
-    # the best epoch, regardless of why fitting stopped.
-    model = tf.keras.models.load_model(paths.model)
-    metadata_path = paths.model.with_suffix(".training.json")
-    metadata_path.write_text(json.dumps({
+    # Fine-tuning writes to a candidate first. The published model is replaced
+    # only when the candidate beats the original validation metric.
+    fine_tuning_published = False
+    final_model_path = paths.model
+    if fine_tuning:
+        if checkpoint_path.exists():
+            candidate = tf.keras.models.load_model(checkpoint_path)
+            candidate_metrics = candidate.evaluate(validation_data, verbose=0, return_dict=True)
+            candidate_metric = _metric_value(candidate_metrics, monitor)
+            min_delta = float(get_cfg(min_delta_key, 1.0e-5))
+            if _improved(candidate_metric, float(baseline_metric), monitor_mode, min_delta):
+                os.replace(checkpoint_path, paths.model)
+                fine_tuning_published = True
+                LOG.info(
+                    "Published fine-tuned model: %s improved from %.8f to %.8f",
+                    monitor, baseline_metric, candidate_metric,
+                )
+            else:
+                checkpoint_path.unlink(missing_ok=True)
+                LOG.info(
+                    "Fine-tuning did not improve %s (baseline %.8f, candidate %.8f); "
+                    "published model was unchanged.", monitor, baseline_metric, candidate_metric,
+                )
+        else:
+            LOG.info("Fine-tuning produced no improving checkpoint; published model was unchanged.")
+        final_model_path = paths.model if paths.model.exists() else source_model
+        model = tf.keras.models.load_model(final_model_path)
+    else:
+        # Reload the published checkpoint so downstream validation always
+        # evaluates the best epoch, regardless of why fitting stopped.
+        model = tf.keras.models.load_model(paths.model)
+    metadata = {
         "target_product": product,
         "sequence_length": sequence_length,
         "forecast_horizon_periods": forecast_horizon,
@@ -398,13 +520,29 @@ def train(output: str | None = None) -> Path:
         "channels": list(CHANNEL_NAMES),
         "train_period_end_index": split_time - 1,
         "validation_period_start_index": split_time,
+        "fine_tuned": fine_tuning,
+        "fine_tuned_from": str(source_model) if source_model else None,
+        "fine_tuning_baseline_metric": baseline_metric,
+        "fine_tuning_published": fine_tuning_published,
         "history": {key: [float(v) for v in values] for key, values in history.history.items()},
-    }, indent=2), encoding="utf-8")
-    LOG.info("Saved best spatial model to %s", paths.model)
-    if bool(get_cfg("spatial_validation.enabled", True)):
+    }
+    if fine_tuning:
+        paths.model.with_suffix(".fine_tuning.json").write_text(
+            json.dumps(metadata, indent=2), encoding="utf-8"
+        )
+    if not fine_tuning or fine_tuning_published:
+        paths.model.with_suffix(".training.json").write_text(
+            json.dumps(metadata, indent=2), encoding="utf-8"
+        )
+    LOG.info("Best available spatial model: %s", final_model_path)
+    run_validation = bool(get_cfg(
+        "spatial_fine_tuning.run_validation" if fine_tuning else "spatial_validation.enabled",
+        True,
+    ))
+    if run_validation and (not fine_tuning or fine_tuning_published):
         from .evaluate_spatial_model import evaluate_spatial_model
-        evaluate_spatial_model(model=model, model_path=str(paths.model))
-    return paths.model
+        evaluate_spatial_model(model=model, model_path=str(final_model_path))
+    return final_model_path
 
 
 def main() -> None:

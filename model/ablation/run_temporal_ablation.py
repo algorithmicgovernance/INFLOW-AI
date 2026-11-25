@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 
 from .temporal_ablation_runner import (
     build_grid,
@@ -8,6 +9,7 @@ from .temporal_ablation_runner import (
     run_staged_temporal_ablation,
 )
 from processing.config import get_cfg
+from model.data_preflight import audit_temporal_data
 
 
 def _bool_values(csv: str) -> list[bool]:
@@ -23,7 +25,23 @@ def _bool_values(csv: str) -> list[bool]:
     return out
 
 
+def _run_data_preflight(configs) -> None:
+    if not bool(get_cfg("data_preflight.enabled", True)):
+        return
+    configs = list(configs)
+    for product in sorted({config.inundation_product for config in configs}):
+        product_configs = [config for config in configs if config.inundation_product == product]
+        include_ecmwf = any(config.include_ecmwf_hindcasts is not False for config in product_configs)
+        audit_temporal_data(
+            product,
+            mode="ablation",
+            include_ecmwf=include_ecmwf,
+            fail_on_error=True,
+        )
+
+
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description="Run temporal inundation ablation studies.")
     parser.add_argument(
         "--models",
@@ -87,6 +105,7 @@ def main() -> None:
                 include_target_lag_features=fixed["include_target_lag_features"],
                 include_feature_lag_features=fixed["include_feature_lag_features"],
             )
+            _run_data_preflight(configs)
             if staged_enabled:
                 feature_blocks = get_cfg("ablation.staged.feature_block_ablations", [])
                 results = run_staged_temporal_ablation(
@@ -114,6 +133,7 @@ def main() -> None:
         inundation_products=[p.strip().lower() for p in args.inundation_products.split(",") if p.strip()],
         seed=args.seed,
     )
+    _run_data_preflight(configs)
 
     results = run_temporal_ablation_grid(configs=configs, log_csv_path=args.log_path)
     success_count = sum(1 for r in results if r.get("status") == "success")

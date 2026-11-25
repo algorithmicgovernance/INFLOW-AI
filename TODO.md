@@ -26,16 +26,23 @@
 - [x] Add transformer model to ablation testing
 - [x] Replace current VIIRS data with data processed by Ross
 - [x] Add ECMWF forecasts from 2025-2026 to training h5, ensure live prediction files can be processed by the operational forecast
-- [ ] Ensure operational forecast uses data from the prelim folder
+- [x] Ensure operational forecast uses data from the prelim folder
 - [x] Add GloFAS data
 - [x] Improve efficiency of data extraction and training for spatial model
 - [x] Retrain spatial model with VIIRS, ECMWF, and GloFAS
 - [x] Retrain spatial model and validate using VIIRS data
-- [ ] Train spatial model again on full data set and deploy
+- [x] Train spatial model again on full data set and deploy
 - [x] Ensure exposure layer is still used and reported on for the spatial model
 - [x] Ensure all pipeline parameters are input in the config and not hardcoded
 - [x] Look for any duplicated files and dead code
 - [x] Update README to accurately descibe current pipeline (ablation, deployment, and config)
+- [x] Write Standard Operating Procedure (run frequency, maintenance, sanity checks, typical error messages, etc.)
+- [ ] Re-run ablataion and visualise results as the best model graph used to do, this should be an automatic output after running ablation tests
+- [ ] Implement Bayesian post-processing to reduce confidence interval and correct predictions
+- [x] Test end-to-end pipeline with trained spatial predictions
+- [ ] Push changes to GitHub, merge branch with main
+- [x] Upload all data and model weights to Google Drive
+- [ ] Dockerise model
 
 ## Major Changes
 - [ ] Implement call to LLM with access to White Nile/South Sudan flooding literature to explain model results and interpret data qualitatively
