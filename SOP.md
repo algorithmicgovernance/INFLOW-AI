@@ -49,11 +49,11 @@ or configuration change.
   python3 -m pip install -r requirements.txt
   ```
 
-- Keep `model/best_temporal_model.json` and every artifact it references under
+- Keep `model/temporal/best_temporal_model.json` and every artifact it references under
   `ablation.artifacts.base_dir`.
 - When `spatial_prediction.enabled: true`, keep a compatible multi-horizon
   ConvLSTM at `spatial_training.model_path` (default
-  `model/spatial_model.keras`). Its input must match the configured sequence,
+  `model/spatial/spatial_model.keras`). Its input must match the configured sequence,
   patch and 10-channel contract, and its output horizon must equal
   `forecast.horizon_periods`.
 - Keep the processed target-aligned HDF5 inputs under
@@ -67,7 +67,7 @@ or configuration change.
 For first-time setup, or to update/rebuild aligned products, run:
 
 ```bash
-python3 -m model.ablation.prepare_temporal_data
+python3 -m model.temporal.data.prepare_temporal_data
 ```
 
 This prepares both temporal products and the gridded products used by spatial
@@ -190,8 +190,8 @@ python3 -m model.spatial.train_convlstm
 
    ```bash
    python3 -m model.spatial.fine_tune_convlstm \
-     --source model/spatial_model.keras \
-     --output model/spatial_model_candidate.keras
+     --source model/spatial/spatial_model.keras \
+     --output model/spatial/spatial_model_candidate.keras
    ```
 
    To use the configured in-place paths instead, run:
@@ -240,7 +240,7 @@ the runbook as they occur.
 | ECMWF gaps or no eligible initialization | Archive gap, timeout or initialization older than configured maximum | Review `sources.ecmwf`, the preflight report and logs; retry when data is available |
 | Spatial validation cannot find rasters | GloFAS 20-/100-year rasters absent | Supply them at `spatial_validation` paths, or deliberately disable validation—not operational inference |
 | Basin-attribute regeneration fails | HydroATLAS GeoPackage absent or replacement not deliberately enabled | Leave regeneration disabled unless inputs are present; use `--force` for an intentional rebuild |
-| Editing `runtime.target_product` does not change deployment product | Best-model metadata is authoritative | Run `python3 -m model.ablation.run_temporal_ablation` for the intended product |
+| Editing `runtime.target_product` does not change deployment product | Best-model metadata is authoritative | Run `python3 -m model.temporal.ablation.run_temporal_ablation` for the intended product |
 | Transformer is not selected for deployment | Joint Transformer models are evaluated but not published as the operational best model | Expected: deployment currently requires lead-specific tabular models |
 | Spatial training/fine-tuning interrupted | Session or machine loss | Rerun the same command; backup state supports resumption and validation checkpoints protect the published model |
 
@@ -271,7 +271,7 @@ reviewer, release decision and release time. Preserve:
 - the run log and output directory;
 - `predictions/data_preflight_before_updates.json` and
   `predictions/data_preflight.json`;
-- `model/ablation/ablation_experiment_log.csv`, including failed experiments;
+- `model/temporal/ablation/ablation_experiment_log.csv`, including failed experiments;
 - `outputs.forecast_performance_csv`; and
 - spatial training/fine-tuning metadata and validation reports.
 
@@ -288,7 +288,7 @@ reviewer, release decision and release time. Preserve:
 
 ## Appendix: key configuration (`config.yaml`)
 
-- `runtime.target_product`: `viirs` or `modis` (best-model metadata is
+- `runtime.target_product`: `viirs` (best-model metadata is
   authoritative during deployment)
 - `forecast.horizon_periods`: default 6; shared temporal/spatial horizon
 - `forecast.interval_percent`: default 80

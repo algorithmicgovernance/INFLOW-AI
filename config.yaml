@@ -5,7 +5,6 @@ sources:
   viirs_final_base_url: "https://gws-access.jasmin.ac.uk/public/tamsat/INFLOW/south-sudan_flood-maps/v2.0/final/"
   viirs_prelim_base_url: "https://gws-access.jasmin.ac.uk/public/tamsat/INFLOW/south-sudan_flood-maps/v2.0/prelim/"
   viirs_prelim_catalogue_url: "https://gws-access.jasmin.ac.uk/public/tamsat/INFLOW/south-sudan_flood-maps/v2.0/prelim/prelim_versions.csv"
-  modis_base_url: "https://data.earthobservation.vam.wfp.org/public-share/sudd_wetland_monitoring/modis_flood_masks/ssdmask"
   rainfall_url: "https://gws-access.jasmin.ac.uk/public/tamsat/INFLOW/rainfall/rfe_time-series/combined/rfe_19830101-present_Lake-Victoria.csv"
   lake_levels:
     albert_api_url: "https://hydroweb.next.theia-land.fr/api"
@@ -30,6 +29,8 @@ sources:
     download_chunk_mb: 4
     user_agent: "INFLOW-AI/1.0"
     skip_empty_remote_files: true
+    redownload_corrupt_files: true
+    corrupt_file_suffix: ".corrupt"
     max_initialization_age_days: 6
     lead_windows_days: [[0, 10], [10, 20], [20, 30], [30, 40]]
     hdf5_compression: "gzip"
@@ -38,7 +39,6 @@ sources:
 paths:
   downloads:
     root: "data/downloads"
-    inundation_modis: "data/downloads/inundation_masks_modis"
     inundation_viirs: "data/downloads/inundation_masks_viirs_v2"
     inundation_viirs_prelim: "data/downloads/inundation_masks_viirs_prelim"
     teleconnections: "data/downloads/teleconnections"
@@ -57,8 +57,6 @@ paths:
     root: "data/historic"
     inundation_h5: "data/historic/viirs-aligned/inundation_viirs.h5"
     inundation_temporal: "data/historic/viirs-aligned/inundation_viirs_temporal.csv"
-    modis_temporal: "data/historic/modis-aligned/inundation_modis_temporal.csv"
-    modis_h5: "data/historic/modis-aligned/inundation_modis.h5"
     viirs_h5: "data/historic/viirs-aligned/inundation_viirs.h5"
     viirs_temporal: "data/historic/viirs-aligned/inundation_viirs_temporal.csv"
     teleconnections: "data/historic/viirs-aligned/teleconnections.csv"
@@ -112,6 +110,9 @@ runtime:
     request_retries: 3
     retry_delay_seconds: 2
     request_timeout_seconds: 120
+    processing:
+      apply_three_period_median_smoothing: false
+      apply_drying_season_correction: false
 
 # Shared by temporal forecasts and spatial ConvLSTM outputs.
 forecast:
@@ -127,9 +128,22 @@ outputs:
   model_report_filename: "model_performance.json"
   graph_dpi: 220
 
+early_action_trigger:
+  enabled: true
+  target_column: "percent_inundation_ssd"
+  percentiles:
+    moderate: 0.80
+    severe: 0.90
+    extreme: 0.95
+  no_history_minimum_forecast_fraction: 0.05
+  output_filename: "TRIGGER ACTIVATED.txt"
+
 # Fail-fast completeness checks run before model fitting or deployment inference.
 data_preflight:
   enabled: true
+  # Predictor products older than this relative to the latest target map are
+  # flagged and excluded from ablation and runtime retraining features.
+  maximum_recent_missing_months: 2
   minimum_target_rows: 100
   maximum_target_missing_fraction: 0.0
   minimum_date_coverage_fraction: 0.95
@@ -138,12 +152,12 @@ data_preflight:
     minimum_available_fraction_after_first: 0.95
     maximum_trailing_missing_periods: 1
   report_paths:
-    ablation: "model/ablation/data_preflight.json"
+    ablation: "model/temporal/ablation/data_preflight.json"
     deployment_initial: "predictions/data_preflight_before_updates.json"
     deployment: "predictions/data_preflight.json"
 
 spatial_training:
-  model_path: "model/spatial_model.keras"
+  model_path: "model/spatial/spatial_model.keras"
   elevation_path: "data/maps/elevation.npy"
   basin_attributes_path: "data/maps/basin_attributes.npy"
   glofas_path: "data/maps/flood_return_period/glofas_10_year_rp.tif"
@@ -176,8 +190,8 @@ spatial_training:
   seed: 42
 
 spatial_fine_tuning:
-  source_model_path: "model/spatial_model.keras"
-  output_model_path: "model/spatial_model.keras"
+  source_model_path: "model/spatial/spatial_model.keras"
+  output_model_path: "model/spatial/spatial_model.keras"
   learning_rate: 0.0001
   max_epochs: 50
   early_stopping_patience: 8
@@ -277,6 +291,7 @@ basin_attributes_processing:
 
 spatial_prediction:
   enabled: true
+  show_msf_project_locations: false
   output_subdirectory: "spatial_predictions"
   static_dir: "data/maps"
   population_centres_path: "data/maps/population_centres/hotosm_ssd_populated_places_points_shp.shp"
@@ -293,6 +308,12 @@ spatial_validation:
   inundation_threshold: 0.5
   glofas_20_year_path: "data/maps/glofas/merged_raster_SSD_20_20260604164952.tif"
   glofas_100_year_path: "data/maps/glofas/merged_raster_SSD_100_20260604172751.tif"
+
+county_predictions:
+  enabled: true
+  counties_path: "data/maps/admin_boundaries/ssd_admbnda_adm2_imwg_nbs_20230829.shp"
+  historic_csv: "data/historic/viirs-aligned/inundation_viirs_county_temporal.csv"
+  output_subdirectory: "county-level predictions"
 
 # Temporal-model ablation and deployment configuration. The key remains stable
 # so existing experiment metadata and artifact paths remain compatible.
@@ -324,7 +345,7 @@ ablation:
       whiten: false
       seed: 42
     transformer:
-      history_length: 12
+      history_length: [12, 24, 36]
       d_model: 64
       nhead: 4
       encoder_layers: 2
@@ -349,9 +370,10 @@ ablation:
     training_cutoff_dates: ["2018-01-01"]
     autoregressive_values: [false]
     target_types: ["raw", "first_differenced", "seasonally_differenced"]
+    seasonally_standardize_features_values: [false, true]
     inundation_products: ["viirs"]
     seed: 42
-    log_path: "model/ablation/ablation_experiment_log.csv"
+    log_path: "model/temporal/ablation/ablation_experiment_log.csv"
   staged:
     enabled: true
     top_n_model_configurations: 3
@@ -382,5 +404,20 @@ ablation:
         include_target_lag_features: false
         include_feature_lag_features: false
   artifacts:
-    base_dir: "model/ablation/artifacts"
+    base_dir: "model/temporal/ablation/artifacts"
+  visualization:
+    enabled: true
+    output_dir: "model/temporal/ablation/artifacts/best_model_plots"
+
+  post_processing:
+    bayesian_calibration:
+      enabled: true
+      draws: 1000
+      tune: 1000
+      chains: 4
+      cores: 1
+      target_accept: 0.90
+      posterior_predictive_draws: 1000
+      output_dir: "model/temporal/post_processing/artifacts"
+      random_seed: 42
 

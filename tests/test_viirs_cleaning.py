@@ -19,7 +19,11 @@ def test_viirs_cleaning_applies_centered_three_observation_median():
         "percent_inundation": [1.0, 10.0, 2.0, 3.0, 4.0],
     })
 
-    cleaned = clean_viirs_temporal_dataframe(dataframe)
+    cleaned = clean_viirs_temporal_dataframe(
+        dataframe,
+        apply_median_smoothing=True,
+        apply_drying_season_correction=False,
+    )
 
     np.testing.assert_allclose(cleaned["percent_inundation"], [5.5, 2.0, 3.0, 3.0, 3.5])
 
@@ -36,7 +40,11 @@ def test_viirs_cleaning_interpolates_drying_period_increases():
         "percent_inundation_region": [6.0, 6.0, 10.0, 10.0, 10.0, 5.0, 5.0],
     })
 
-    cleaned = clean_viirs_temporal_dataframe(dataframe)
+    cleaned = clean_viirs_temporal_dataframe(
+        dataframe,
+        apply_median_smoothing=True,
+        apply_drying_season_correction=True,
+    )
 
     expected = [6.0, 6.0, 5.75, 5.5, 5.25, 5.0, 5.0]
     np.testing.assert_allclose(cleaned["percent_inundation"], expected)
@@ -52,7 +60,11 @@ def test_viirs_cleaning_leaves_no_drying_period_increases_between_anchors():
         "percent_inundation": [6.0, 6.0, 10.0, 10.0, 10.0, 5.0, 5.0],
     })
 
-    cleaned = clean_viirs_temporal_dataframe(dataframe)
+    cleaned = clean_viirs_temporal_dataframe(
+        dataframe,
+        apply_median_smoothing=True,
+        apply_drying_season_correction=True,
+    )
     drying_values = cleaned.loc[cleaned["period_start"].dt.month.isin([12, 1, 2, 3, 4]), "percent_inundation"]
 
     assert drying_values.diff().dropna().le(0).all()
@@ -67,7 +79,11 @@ def test_viirs_cleaning_can_use_post_april_recovery_anchor():
         "percent_inundation": [6.0, 6.0, 6.0, 8.0, 8.0, 5.0, 5.0],
     })
 
-    cleaned = clean_viirs_temporal_dataframe(dataframe)
+    cleaned = clean_viirs_temporal_dataframe(
+        dataframe,
+        apply_median_smoothing=True,
+        apply_drying_season_correction=True,
+    )
 
     assert cleaned.loc[4, "percent_inundation"] < cleaned.loc[3, "percent_inundation"]
     assert cleaned.loc[5, "percent_inundation"] == 5.0
@@ -82,7 +98,26 @@ def test_viirs_cleaning_handles_record_starting_mid_drying_season():
         "percent_inundation": [6.0, 6.0, 9.0, 9.0, 9.0, 5.0, 5.0],
     })
 
-    cleaned = clean_viirs_temporal_dataframe(dataframe)
+    cleaned = clean_viirs_temporal_dataframe(
+        dataframe,
+        apply_median_smoothing=True,
+        apply_drying_season_correction=True,
+    )
     drying_values = cleaned.loc[cleaned["period_start"].dt.month.isin([2, 3, 4]), "percent_inundation"]
 
     assert drying_values.diff().dropna().le(0).all()
+
+
+def test_viirs_cleaning_leaves_raw_values_unchanged_when_features_are_disabled():
+    dataframe = pd.DataFrame({
+        "period_start": pd.to_datetime(["2020-12-01", "2020-12-11", "2020-12-21"]),
+        "percent_inundation": [1.0, 10.0, 2.0],
+    })
+
+    cleaned = clean_viirs_temporal_dataframe(
+        dataframe,
+        apply_median_smoothing=False,
+        apply_drying_season_correction=False,
+    )
+
+    np.testing.assert_allclose(cleaned["percent_inundation"], [1.0, 10.0, 2.0])

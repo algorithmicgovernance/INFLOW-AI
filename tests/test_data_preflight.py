@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 import h5py
 
-import model.data_preflight as preflight
+import model.temporal.data.preflight as preflight
 
 
 def _write_sources(folder: Path, availability: list[bool]):
@@ -61,3 +61,34 @@ def test_data_preflight_blocks_large_or_trailing_ecmwf_gaps(tmp_path, monkeypatc
         )
     report = pd.read_json(tmp_path / "report.json", typ="series")
     assert report["passed"] is False
+
+
+def test_recent_source_coverage_flags_predictors_older_than_two_calendar_months(tmp_path):
+    source = tmp_path / "rainfall.csv"
+    pd.DataFrame({
+        "date": ["2024-03-14", "2024-03-15"],
+        "rainfall": [1.0, 2.0],
+    }).to_csv(source, index=False)
+
+    result = preflight.assess_recent_source_coverage(
+        source,
+        pd.Timestamp("2024-05-16"),
+        maximum_missing_months=2,
+    )
+
+    assert result["excluded_from_training"] is True
+    assert result["latest_usable_date"] == "2024-03-15"
+    assert result["required_since_date"] == "2024-03-16"
+
+
+def test_recent_source_coverage_keeps_data_on_two_month_boundary(tmp_path):
+    source = tmp_path / "rainfall.csv"
+    pd.DataFrame({"date": ["2024-03-16"], "rainfall": [1.0]}).to_csv(source, index=False)
+
+    result = preflight.assess_recent_source_coverage(
+        source,
+        pd.Timestamp("2024-05-16"),
+        maximum_missing_months=2,
+    )
+
+    assert result["excluded_from_training"] is False

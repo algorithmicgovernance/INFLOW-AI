@@ -1,8 +1,8 @@
 import numpy as np
 
-from model.ablation.models import MODEL_REGISTRY
-from model.ablation.models.transformer_model import TransformerInput
-from model.ablation.temporal_transformer_pipeline import _future_tokens, _split_feature_indices
+from model.temporal.ablation.temporal_model_candidates import MODEL_REGISTRY
+from model.temporal.ablation.temporal_model_candidates.transformer_model import TransformerInput
+from model.temporal.ablation.temporal_transformer_pipeline import _future_tokens, _split_feature_indices
 
 
 def test_transformer_is_registered_without_importing_torch():

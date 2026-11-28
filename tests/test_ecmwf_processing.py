@@ -13,11 +13,14 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+import processing.data_cleaning.process_ecmwf as ecmwf
 from processing.data_cleaning.process_ecmwf import (
     LEAD_END_DAYS,
     LEAD_START_DAYS,
     SCHEMA_VERSION,
     _blocks,
+    _cleanup_obsolete_backups,
+    _deduplicate_inventory_runs,
     _ensure_hdf5,
     _inventory_runs,
     _merge_runs,
@@ -25,6 +28,25 @@ from processing.data_cleaning.process_ecmwf import (
     _run_slices,
     _select_runs,
 )
+
+
+def test_successful_migration_cleanup_removes_only_ecmwf_backups(tmp_path):
+    hdf = tmp_path / "ecmwf.h5"
+    csv = tmp_path / "ecmwf.csv"
+    backups = [
+        tmp_path / "ecmwf.h5.pre-coarse.bak",
+        tmp_path / "ecmwf.h5.pre-coarse.1.bak",
+        tmp_path / "ecmwf.csv.pre-coarse.bak",
+    ]
+    unrelated = tmp_path / "ecmwf.h5.other.bak"
+    for path in [*backups, unrelated]:
+        path.write_text("backup", encoding="utf-8")
+
+    removed = _cleanup_obsolete_backups(hdf, csv)
+
+    assert set(removed) == set(backups)
+    assert all(not path.exists() for path in backups)
+    assert unrelated.exists()
 
 
 def test_archived_forecast_placeholder_times_are_reconstructed_from_filename():
@@ -73,6 +95,79 @@ def test_ecmwf_inventory_reuses_unchanged_file_cache(tmp_path, monkeypatch):
     )
     second = _inventory_runs([source], "forecast", "forecast_2025", cache_path=cache)
     assert second[0]["init"] == first[0]["init"]
+
+
+def test_corrupt_ecmwf_file_is_redownloaded_before_inventory(tmp_path, monkeypatch):
+    source = tmp_path / "sfc-24ac-ecmwf-20250101.nc"
+    source.write_bytes(b"not-netcdf")
+    cache = tmp_path / "inventory.json"
+    calls = {"inspect": 0, "download": 0}
+
+    def inspect(path, source_type, source_kind):
+        calls["inspect"] += 1
+        if calls["inspect"] == 1:
+            raise ValueError("invalid file")
+        init = pd.Timestamp("2025-01-01")
+        return [{
+            "init": init, "path": path,
+            "blocks": _blocks(init, init + pd.Timedelta(days=46)),
+            "ensemble_size": 100, "source_kind": source_kind,
+        }]
+
+    def redownload(base_url, folder, **kwargs):
+        calls["download"] += 1
+        source.write_bytes(b"replacement")
+        return [source]
+
+    monkeypatch.setattr(ecmwf, "_inspect_inventory_file", inspect)
+    monkeypatch.setattr(ecmwf, "download_ecmwf_files", redownload)
+    runs = _inventory_runs(
+        [source], "forecast", "forecast_2025", cache_path=cache,
+        base_url="https://example.test/",
+    )
+    assert len(runs) == 1
+    assert calls == {"inspect": 2, "download": 1}
+    assert list(tmp_path.glob("*.corrupt"))
+
+
+def test_unrepairable_ecmwf_file_is_quarantined_and_skipped(tmp_path, monkeypatch):
+    source = tmp_path / "sfc-24ac-ecmwf-20250101.nc"
+    source.write_bytes(b"not-netcdf")
+    monkeypatch.setattr(
+        ecmwf, "_inspect_inventory_file",
+        lambda *args: (_ for _ in ()).throw(ValueError("invalid file")),
+    )
+    monkeypatch.setattr(
+        ecmwf, "download_ecmwf_files",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("server failed")),
+    )
+    runs = _inventory_runs(
+        [source], "forecast", "forecast_2025",
+        cache_path=tmp_path / "inventory.json", base_url="https://example.test/",
+    )
+    assert runs == []
+    assert not source.exists()
+    assert list(tmp_path.glob("*.corrupt"))
+
+
+def test_duplicate_initialization_prefers_canonical_file_over_copy(tmp_path):
+    canonical = tmp_path / "sfc-24ac-ecmwf-20260601.nc"
+    duplicate = tmp_path / "sfc-24ac-ecmwf-20260601_COPY.nc"
+    canonical.write_bytes(b"canonical")
+    duplicate.write_bytes(b"larger-copy-file")
+    init = pd.Timestamp("2026-06-01")
+    common = {
+        "init": init,
+        "blocks": _blocks(init, init + pd.Timedelta(days=46)),
+        "ensemble_size": 100,
+        "source_kind": "forecast_rt",
+    }
+    result = _deduplicate_inventory_runs(
+        [{**common, "path": duplicate}, {**common, "path": canonical}],
+        "forecast_rt",
+    )
+    assert len(result) == 1
+    assert result[0]["path"] == canonical
 
 
 def test_live_forecast_replaces_same_date_from_older_archive():

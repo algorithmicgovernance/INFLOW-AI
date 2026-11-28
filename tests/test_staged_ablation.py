@@ -1,4 +1,4 @@
-from model.ablation.temporal_ablation_runner import build_temporal_feature_ablation_configs
+from model.temporal.ablation.temporal_ablation_runner import build_temporal_feature_ablation_configs
 
 
 def test_feature_ablation_skips_fixed_and_effective_duplicates_for_non_ar_model():

@@ -1,8 +1,13 @@
-"""Validate the multi-horizon spatial model against spatial baselines.
+"""Validate spatial change detection against persistence and GloFAS baselines.
 
-Every prediction is converted to a binary tile using the known observed count
-of inundated pixels for that tile and lead. The highest-scoring ``n`` pixels
-are selected for the ConvLSTM, persistence, and GloFAS baselines alike.
+ConvLSTM and GloFAS scores are converted to binary tiles using the known
+observed count of inundated pixels for each tile and lead. Persistence is a
+strict no-change baseline: its prediction is always the original binary mask.
+
+Evaluation treats each pixel as one of four origin-to-target classes: dry to
+dry, dry to flood, flood to dry, and flood to flood. Per-class precision,
+recall, F1, and IoU make onset and recession skill explicit rather than letting
+the much more common stable pixels dominate the headline accuracy.
 """
 from __future__ import annotations
 
@@ -54,6 +59,11 @@ def _transition_classes(origin: np.ndarray, state: np.ndarray) -> np.ndarray:
     return np.where(origin, np.where(state, 3, 2), np.where(state, 1, 0)).astype(np.uint8)
 
 
+def _persistence_mask(origin: np.ndarray, horizon: int) -> np.ndarray:
+    """Repeat the origin mask without using any future inundation information."""
+    return np.repeat(np.asarray(origin, dtype=bool)[:, np.newaxis], horizon, axis=1)
+
+
 def _safe_ratio(numerator: float, denominator: float) -> float:
     return float(numerator / denominator) if denominator else float("nan")
 
@@ -64,8 +74,39 @@ def _metrics(binary: np.ndarray, transitions: np.ndarray) -> dict[str, float]:
     precision = _safe_ratio(tp, tp + fp)
     recall = _safe_ratio(tp, tp + fn)
     transition_support = transitions.sum(axis=1).astype(np.float64)
+    transition_predicted = transitions.sum(axis=0).astype(np.float64)
+    transition_true_positives = np.diag(transitions).astype(np.float64)
+    transition_total = float(transitions.sum())
     transition_recalls = np.asarray([
-        _safe_ratio(transitions[index, index], transition_support[index]) for index in range(4)
+        _safe_ratio(transition_true_positives[index], transition_support[index])
+        for index in range(4)
+    ])
+    transition_precisions = np.asarray([
+        (_safe_ratio(transition_true_positives[index], transition_predicted[index])
+         if transition_predicted[index] else 0.0)
+        for index in range(4)
+    ])
+    transition_f1s = np.asarray([
+        (_safe_ratio(2.0 * transition_precisions[index] * transition_recalls[index],
+                     transition_precisions[index] + transition_recalls[index])
+         if transition_precisions[index] + transition_recalls[index] else 0.0)
+        for index in range(4)
+    ])
+    transition_ious = np.asarray([
+        _safe_ratio(
+            transition_true_positives[index],
+            transition_support[index] + transition_predicted[index]
+            - transition_true_positives[index],
+        )
+        for index in range(4)
+    ])
+    transition_accuracies = np.asarray([
+        _safe_ratio(
+            transition_total - transition_support[index] - transition_predicted[index]
+            + 2.0 * transition_true_positives[index],
+            transition_total,
+        )
+        for index in range(4)
     ])
     result = {
         "accuracy": _safe_ratio(tp + tn, total),
@@ -81,11 +122,49 @@ def _metrics(binary: np.ndarray, transitions: np.ndarray) -> dict[str, float]:
             transitions[2, 2] + transitions[3, 3], transition_support[2] + transition_support[3]
         ),
         "transition_macro_recall": float(np.nanmean(transition_recalls)),
+        "transition_macro_precision": float(np.nanmean(transition_precisions)),
+        "transition_macro_f1": float(np.nanmean(transition_f1s)),
+        "transition_macro_iou": float(np.nanmean(transition_ious)),
+        "transition_macro_accuracy": float(np.nanmean(transition_accuracies)),
     }
     for index, name in enumerate(TRANSITION_NAMES):
+        true_positive = int(transition_true_positives[index])
+        false_positive = int(transition_predicted[index] - transition_true_positives[index])
+        false_negative = int(transition_support[index] - transition_true_positives[index])
+        result[f"{name}_precision"] = float(transition_precisions[index])
         result[f"{name}_recall"] = float(transition_recalls[index])
+        result[f"{name}_f1"] = float(transition_f1s[index])
+        result[f"{name}_accuracy"] = float(transition_accuracies[index])
+        result[f"{name}_iou"] = float(transition_ious[index])
         result[f"{name}_support"] = int(transition_support[index])
+        result[f"{name}_predicted"] = int(transition_predicted[index])
+        result[f"{name}_true_positive"] = true_positive
+        result[f"{name}_false_positive"] = false_positive
+        result[f"{name}_false_negative"] = false_negative
     return result
+
+
+def _change_detection_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Convert wide validation metrics into an analysis-friendly class table."""
+    output = []
+    for row in rows:
+        for name in TRANSITION_NAMES:
+            output.append({
+                "model": row["model"],
+                "lead_period": row["lead_period"],
+                "transition": name,
+                "accuracy": row[f"{name}_accuracy"],
+                "precision": row[f"{name}_precision"],
+                "recall": row[f"{name}_recall"],
+                "f1": row[f"{name}_f1"],
+                "iou": row[f"{name}_iou"],
+                "support": row[f"{name}_support"],
+                "predicted": row[f"{name}_predicted"],
+                "true_positive": row[f"{name}_true_positive"],
+                "false_positive": row[f"{name}_false_positive"],
+                "false_negative": row[f"{name}_false_negative"],
+            })
+    return output
 
 
 def _update_counts(
@@ -171,8 +250,12 @@ def evaluate_spatial_model(model=None, model_path: str | None = None) -> tuple[P
                 )
             score_sets = {
                 "convlstm": model_scores,
-                "persistence": np.repeat(origin[:, np.newaxis], horizon, axis=1).astype(np.float32),
             }
+            persistence = _persistence_mask(origin, horizon)
+            _update_counts(
+                binary["persistence"], transitions["persistence"],
+                actual, persistence, origin,
+            )
             batch_samples = samples[
                 batch_index * batch_size:(batch_index + 1) * batch_size
             ]
@@ -204,19 +287,40 @@ def evaluate_spatial_model(model=None, model_path: str | None = None) -> tuple[P
 
     csv_path = paths.model.with_suffix(".validation.csv")
     json_path = paths.model.with_suffix(".validation.json")
+    change_csv_path = paths.model.with_suffix(".change_detection.validation.csv")
+    change_rows = _change_detection_rows(rows)
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     with csv_path.open("w", newline="", encoding="utf-8") as output:
         writer = csv.DictWriter(output, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
+    with change_csv_path.open("w", newline="", encoding="utf-8") as output:
+        writer = csv.DictWriter(output, fieldnames=list(change_rows[0]))
+        writer.writeheader()
+        writer.writerows(change_rows)
     json_path.write_text(json.dumps({
         "target_product": product,
         "forecast_horizon_periods": horizon,
         "known_pixel_count_applied": True,
+        "known_pixel_count_models": ["convlstm", "glofas_20_year", "glofas_100_year"],
+        "persistence_definition": "origin_mask_repeated_unchanged",
         "transition_classes": list(TRANSITION_NAMES),
+        "change_detection_metrics": ["f1", "accuracy", "precision", "recall", "iou"],
+        "change_detection_csv": str(change_csv_path),
         "results": rows,
+        "change_detection_results": change_rows,
     }, indent=2, allow_nan=True), encoding="utf-8")
-    LOG.info("Saved spatial validation results to %s and %s", csv_path, json_path)
+    LOG.info(
+        "Saved spatial validation results to %s, %s, and %s",
+        csv_path, json_path, change_csv_path,
+    )
+    from readme_status import update_spatial_validation_readme
+    update_spatial_validation_readme(
+        change_rows,
+        forecast_horizon_periods=horizon,
+        csv_path=change_csv_path,
+        json_path=json_path,
+    )
     return csv_path, json_path
 
 

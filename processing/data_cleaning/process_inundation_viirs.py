@@ -16,6 +16,7 @@ import pandas as pd
 # Import geospatial libraries
 import geopandas as gpd
 import rasterio
+from rasterio.features import rasterize
 
 # Import client libraries
 import requests
@@ -676,9 +677,28 @@ def build_viirs_temporal_dataframe(file_names, clipped_rasters, regions_gdf=None
         for i in range(len(regions_gdf)):
             region_data = regions_gdf.iloc[[i]]
             region_code = gridded_stats.region_to_code_dict[region_data["region"].values[0]]
-            region_area = cleaning_utils.mask_regions(region_data, np.array(clipped_rasters))
-            region_series = np.nansum(region_area, axis=(1, 2)) / (
-                total_cells - np.sum(np.isnan(region_area[0]))
+            if region_data.crs != cleaning_utils.MASK_REGIONS_REF_CRS:
+                region_data = region_data.to_crs(cleaning_utils.MASK_REGIONS_REF_CRS)
+            region_mask = rasterize(
+                [(geometry, 1) for geometry in region_data.geometry],
+                out_shape=cleaning_utils.MASK_REGIONS_REF_SHAPE,
+                transform=cleaning_utils.MASK_REGIONS_REF_TRANSFORM,
+                fill=0,
+                all_touched=True,
+                dtype=np.uint8,
+            ).astype(bool)
+            region_cells = int(region_mask.sum())
+            if region_cells == 0:
+                raise ValueError(f"Region {region_code} does not overlap the VIIRS grid.")
+            # Avoid np.where(..., np.nan), which promotes the complete historic
+            # raster stack to a multi-gigabyte float array for every region.
+            region_series = np.fromiter(
+                (
+                    np.count_nonzero(np.asarray(raster)[region_mask]) / region_cells
+                    for raster in clipped_rasters
+                ),
+                dtype=np.float64,
+                count=len(clipped_rasters),
             )
             inundation_temporal[f"percent_inundation_{region_code}"] = region_series
 
@@ -687,6 +707,126 @@ def build_viirs_temporal_dataframe(file_names, clipped_rasters, regions_gdf=None
         inundation_temporal = inundation_temporal.sort_values(sort_cols).reset_index(drop=True)
 
     return inundation_temporal
+
+
+def load_county_boundaries(counties_path=None):
+    """Load South Sudan ADM2 counties, falling back from an incomplete copy."""
+    requested = Path(counties_path or get_cfg(
+        "county_predictions.counties_path",
+        "data/maps/admin_boundaries/ssd_admbnda_adm2_imwg_nbs_20230829 2.shp",
+    ))
+    candidates = [requested]
+    if " 2" in requested.stem:
+        candidates.append(requested.with_name(requested.name.replace(" 2.shp", ".shp")))
+    candidates.append(Path(
+        "data/maps/admin_boundaries/ssd_admbnda_adm2_imwg_nbs_20230829.shp"
+    ))
+    errors = []
+    for candidate in dict.fromkeys(candidates):
+        if not candidate.exists():
+            errors.append(f"{candidate}: missing")
+            continue
+        try:
+            counties = gpd.read_file(candidate)
+        except Exception as exc:
+            errors.append(f"{candidate}: {exc}")
+            continue
+        required = {"ADM2_EN", "ADM2_PCODE", "ADM1_EN", "ADM1_PCODE", "geometry"}
+        missing = required.difference(counties.columns)
+        if missing:
+            errors.append(f"{candidate}: missing fields {sorted(missing)}")
+            continue
+        counties = counties[list(required)].copy()
+        counties = counties[counties.geometry.notna() & ~counties.geometry.is_empty].copy()
+        counties.attrs["source_path"] = str(candidate)
+        if candidate != requested:
+            logging.warning(
+                "Configured county shapefile %s could not be used; using %s.",
+                requested, candidate,
+            )
+        return counties
+    raise FileNotFoundError("Unable to load an ADM2 county shapefile: " + "; ".join(errors))
+
+
+def county_reference_labels(counties_path=None):
+    """Return ADM2 boundaries and a compact county-label VIIRS grid."""
+    counties = load_county_boundaries(counties_path)
+    source_path = counties.attrs.get("source_path")
+    counties = counties.to_crs(cleaning_utils.MASK_REGIONS_REF_CRS).reset_index(drop=True)
+    counties.attrs["source_path"] = source_path
+    labels = rasterize(
+        [(geometry, index + 1) for index, geometry in enumerate(counties.geometry)],
+        out_shape=cleaning_utils.MASK_REGIONS_REF_SHAPE,
+        transform=cleaning_utils.MASK_REGIONS_REF_TRANSFORM,
+        fill=0,
+        all_touched=True,
+        dtype=np.uint16,
+    )
+    counts = np.bincount(labels.ravel(), minlength=len(counties) + 1)[1:]
+    empty = np.flatnonzero(counts == 0)
+    if len(empty):
+        raise ValueError(
+            f"Counties do not overlap the VIIRS grid: "
+            f"{counties.iloc[empty]['ADM2_EN'].tolist()}"
+        )
+    return counties, labels
+
+
+def build_county_viirs_temporal_csv(
+    h5_file_path,
+    temporal_data_path,
+    output_path=None,
+    counties_path=None,
+):
+    """Aggregate the aligned VIIRS HDF5 into one historic series per county."""
+    output = Path(output_path or get_cfg(
+        "county_predictions.historic_csv",
+        "data/historic/viirs-aligned/inundation_viirs_county_temporal.csv",
+    ))
+    temporal = pd.read_csv(temporal_data_path)
+    counties, labels = county_reference_labels(counties_path)
+    with h5py.File(h5_file_path, "r") as hdf:
+        if VIIRS_DSET_NAME not in hdf:
+            raise KeyError(f"Dataset '{VIIRS_DSET_NAME}' not found in {h5_file_path}.")
+        dataset = hdf[VIIRS_DSET_NAME]
+        if len(temporal) != dataset.shape[0]:
+            raise ValueError(
+                f"County aggregation requires matching VIIRS rows: HDF5 has "
+                f"{dataset.shape[0]}, temporal CSV has {len(temporal)}."
+            )
+        metadata_columns = [
+            column for column in temporal.columns
+            if not column.startswith("percent_inundation")
+        ]
+        result = temporal[metadata_columns].copy()
+        if tuple(dataset.shape[-2:]) != tuple(labels.shape):
+            raise ValueError(
+                f"County labels have shape {labels.shape}, but VIIRS has "
+                f"shape {dataset.shape[-2:]}."
+            )
+        cell_counts = np.bincount(labels.ravel(), minlength=len(counties) + 1)[1:]
+        county_values = np.empty((dataset.shape[0], len(counties)), dtype=np.float64)
+        for time_index in range(dataset.shape[0]):
+            frame = np.asarray(dataset[time_index]) == 1
+            flooded = np.bincount(
+                labels[frame & (labels > 0)], minlength=len(counties) + 1
+            )[1:]
+            county_values[time_index] = flooded / cell_counts
+        for index, county in enumerate(counties.itertuples(index=False)):
+            result[f"percent_inundation_{county.ADM2_PCODE.lower()}"] = county_values[:, index]
+    output.parent.mkdir(parents=True, exist_ok=True)
+    result.to_csv(output, index=False)
+    mapping = counties.drop(columns="geometry").copy()
+    mapping["temporal_column"] = (
+        "percent_inundation_" + mapping["ADM2_PCODE"].str.lower()
+    )
+    mapping["viirs_grid_cells"] = np.bincount(
+        labels.ravel(), minlength=len(counties) + 1
+    )[1:].astype(int)
+    mapping["county_shapefile"] = counties.attrs.get("source_path", "unknown")
+    mapping.to_csv(output.with_name(output.stem + "_counties.csv"), index=False)
+    logging.info("Wrote %d county VIIRS histories to %s.", len(counties), output)
+    return output, counties, labels
 
 
 def _viirs_observation_dates(dataframe):
@@ -771,19 +911,43 @@ def _remove_drying_period_increases(series, dates):
     return cleaned
 
 
-def clean_viirs_temporal_dataframe(dataframe):
-    """Smooth and remove drying-season artifacts from VIIRS inundation series."""
+def clean_viirs_temporal_dataframe(
+    dataframe,
+    *,
+    apply_median_smoothing=None,
+    apply_drying_season_correction=None,
+):
+    """Optionally smooth and correct the VIIRS inundation series.
+
+    Both transformations are disabled unless explicitly enabled by an argument
+    or in ``runtime.viirs.processing`` configuration.
+    """
     cleaned = dataframe.copy()
     dates = _viirs_observation_dates(cleaned)
     value_columns = [column for column in cleaned if column.startswith("percent_inundation")]
+    if apply_median_smoothing is None:
+        apply_median_smoothing = bool(get_cfg(
+            "runtime.viirs.processing.apply_three_period_median_smoothing", False
+        ))
+    if apply_drying_season_correction is None:
+        apply_drying_season_correction = bool(get_cfg(
+            "runtime.viirs.processing.apply_drying_season_correction", False
+        ))
 
     for column in value_columns:
-        smoothed = pd.to_numeric(cleaned[column], errors="coerce").rolling(
-            window=3,
-            center=True,
-            min_periods=1,
-        ).median()
-        cleaned[column] = _remove_drying_period_increases(smoothed, dates)
+        values = pd.to_numeric(cleaned[column], errors="coerce")
+        if apply_median_smoothing:
+            values = values.rolling(window=3, center=True, min_periods=1).median()
+        if apply_drying_season_correction:
+            values = _remove_drying_period_increases(values, dates)
+        cleaned[column] = values
+
+    logging.info(
+        "VIIRS temporal transformations: three-period median smoothing=%s, "
+        "drying-season correction=%s",
+        apply_median_smoothing,
+        apply_drying_season_correction,
+    )
 
     return cleaned
 

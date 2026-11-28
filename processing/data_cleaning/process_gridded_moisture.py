@@ -141,12 +141,12 @@ def _get_latest_valid_moisture_netcdf(extract_folder, required_start=None, requi
 	)
 
 
-def group_dates_by_target_period(dates, target_product="modis"):
+def group_dates_by_target_period(dates, target_product="viirs"):
 	"""Group dates into target-product windows."""
 	return cleaning_utils.group_dates_by_target_period(dates, target_product=target_product)
 
 
-def export_decadal_geotiffs(extract_folder, output_folder, target_product="modis"):
+def export_decadal_geotiffs(extract_folder, output_folder, target_product="viirs"):
 	"""Export moisture grouped by target period into GeoTIFF files."""
 	os.makedirs(output_folder, exist_ok=True)
 

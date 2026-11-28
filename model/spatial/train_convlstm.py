@@ -4,7 +4,7 @@ Run from the project root after preparing the configured target-product data:
 
     python3 -m model.spatial.train_convlstm
 
-The model consumes the same ten channels as ``model.make_spatial_prediction``:
+The model consumes the same ten channels as ``model.spatial.make_spatial_prediction``:
 inundation, rainfall, soil moisture, elevation, basin attributes, four ECMWF
 forecast windows, and GloFAS. Historic grids are streamed from HDF5 by batch,
 so the full space-time cube is never expanded in memory.
@@ -45,7 +45,7 @@ class TrainingPaths:
 
 def _paths(target_product: str, output: str | None = None) -> TrainingPaths:
     aligned = Path(get_cfg("paths.historic.root", "data/historic")) / f"{target_product}-aligned"
-    inundation_name = "inundation_viirs.h5" if target_product == "viirs" else "inundation_modis.h5"
+    inundation_name = "inundation_viirs.h5"
     return TrainingPaths(
         inundation=aligned / inundation_name,
         rainfall=aligned / "gridded_rainfall.h5",
@@ -58,7 +58,7 @@ def _paths(target_product: str, output: str | None = None) -> TrainingPaths:
         glofas=Path(get_cfg(
             "spatial_training.glofas_path", "data/maps/flood_return_period/glofas_10_year_rp.tif"
         )),
-        model=Path(output or get_cfg("spatial_training.model_path", "model/spatial_model.keras")),
+        model=Path(output or get_cfg("spatial_training.model_path", "model/spatial/spatial_model.keras")),
     )
 
 

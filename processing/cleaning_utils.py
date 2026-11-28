@@ -21,8 +21,7 @@ from .config import get_cfg
 
 # -----------------------------------------------------------------------------
 # Static reference grid for region masking
-# Derived from: data/downloads/inundation_masks_modis/20020801.tif
-# with catchment crop applied using data/maps/inflow_catchments/INFLOW_all_cmts.shp
+# Shared VIIRS-aligned grid with the catchment crop applied.
 # -----------------------------------------------------------------------------
 MASK_REGIONS_REF_CRS = get_cfg("reference_grid.mask_regions.crs", "EPSG:6933")
 MASK_REGIONS_REF_TRANSFORM = tuple(
@@ -158,35 +157,27 @@ ABYEI_PATH = get_cfg(
 
 
 def resolve_target_product(target_product=None):
-    """Resolve target product from explicit argument or config."""
-    resolved = (target_product or get_cfg("runtime.target_product", "modis")).lower().strip()
-    if resolved not in {"modis", "viirs"}:
-        raise ValueError(f"Invalid target_product '{resolved}'. Expected 'modis' or 'viirs'.")
+    """Resolve the sole supported inundation product."""
+    resolved = (target_product or get_cfg("runtime.target_product", "viirs")).lower().strip()
+    if resolved != "viirs":
+        raise ValueError(f"Invalid target_product '{resolved}'. Expected 'viirs'.")
     return resolved
 
 
 def get_target_historic_path(filename, target_product=None):
-    """Return a historic output path inside the selected product-aligned folder."""
-    target_product = resolve_target_product(target_product)
+    """Return a historic output path inside the VIIRS-aligned folder."""
+    resolve_target_product(target_product)
     historic_root = get_cfg("paths.historic.root", "data/historic")
-    return os.path.join(historic_root, f"{target_product}-aligned", filename)
+    return os.path.join(historic_root, "viirs-aligned", filename)
 
 
 def _target_temporal_candidates(target_product):
-    """Return candidate temporal CSV paths for a target product in priority order."""
-    target_product = resolve_target_product(target_product)
-
-    if target_product == "viirs":
-        return [
-            get_cfg("paths.historic.viirs_temporal", "data/historic/inundation_viirs_temporal.csv"),
-            "data/historic/viirs_inundation_temporal.csv",
-            "data/historic/inundation_viirs_temporal.csv",
-        ]
-
+    """Return candidate VIIRS temporal CSV paths in priority order."""
+    resolve_target_product(target_product)
     return [
-        get_cfg("paths.historic.modis_temporal", "data/historic/inundation_modis_temporal.csv"),
-        get_cfg("paths.historic.inundation_temporal", "data/historic/inundation_temporal.csv"),
-        "data/historic/inundation_modis_temporal.csv",
+        get_cfg("paths.historic.viirs_temporal", "data/historic/viirs-aligned/inundation_viirs_temporal.csv"),
+        "data/historic/viirs-aligned/inundation_viirs_temporal.csv",
+        "data/historic/inundation_viirs_temporal.csv",
     ]
 
 
@@ -203,13 +194,12 @@ def get_target_start_date(target_product=None):
     """
     Get the first available date from the selected target product temporal CSV.
 
-    For VIIRS data this prefers `period_start` and falls back to `date`.
-    For MODIS this prefers `date`.
+    Prefers `period_start` and falls back to `date`.
     """
     target_product = resolve_target_product(target_product)
     temporal_path = get_target_temporal_path(target_product)
 
-    fallback = "2012-02-01" if target_product == "viirs" else "2002-07-01"
+    fallback = "2002-07-01"
     if not temporal_path or not os.path.exists(temporal_path):
         return fallback
 
@@ -219,7 +209,7 @@ def get_target_start_date(target_product=None):
         return fallback
 
     date_candidates = []
-    if target_product == "viirs" and "period_start" in df.columns:
+    if "period_start" in df.columns:
         date_candidates.append(pd.to_datetime(df["period_start"], errors="coerce"))
     if "date" in df.columns:
         date_candidates.append(pd.to_datetime(df["date"], errors="coerce"))
@@ -241,7 +231,7 @@ def get_dates_of_interest(start_date_str=None, end_date_str=None, target_product
     Parameters:
         start_date_str (str | None): Start date in 'YYYY-MM-DD'. If None, inferred from target product temporal CSV.
         end_date_str (str | None): End date in 'YYYY-MM-DD'. Defaults to today if not provided.
-        target_product (str | None): Either 'modis' or 'viirs'. If None, read from config.
+        target_product (str | None): Must be 'viirs' when provided.
 
     Returns:
         list: A list of dates (in 'YYYY-MM-DD' format) aligned to target cadence.
@@ -323,11 +313,11 @@ def get_local_download_dates(download_path_full):
     return local_dates
 
 
-def group_dates_by_target_period(dates, target_product='modis'):
+def group_dates_by_target_period(dates, target_product='viirs'):
     """
     Group daily dates into target-product windows.
 
-    MODIS and VIIRS v2 windows: day 1-10, 11-20, 21-end.
+    VIIRS windows: day 1-10, 11-20, 21-end.
 
     Returns:
         tuple[list[list[datetime]], list[list[int]]]
@@ -507,7 +497,7 @@ def mask_regions(gdf, data):
     - data: array
         3D array with values to be masked.
     Uses static reference grid config derived from
-    data/downloads/inundation_masks_modis/20020801.tif (catchment-cropped).
+    the catchment-cropped VIIRS reference grid.
 
     Returns:
     - masked_regions: array

@@ -1,0 +1,54 @@
+{
+  "best_k": 8,
+  "configuration_signature": {
+    "autoregressive": false,
+    "feature_block_name": "historical_only",
+    "include_ecmwf_hindcasts": false,
+    "include_feature_lag_features": false,
+    "include_target_lag_features": false,
+    "inundation_product": "viirs",
+    "lead_period": 4,
+    "seasonally_standardize_features": false,
+    "target_type": "seasonally_differenced",
+    "training_cutoff_date": "2018-01-01"
+  },
+  "cv_mean_mae_by_k": {
+    "16": 1.7026368776957195,
+    "32": 2.3124924500783286,
+    "75": 3.163106362024943,
+    "8": 1.4393742481867473
+  },
+  "dataset_fingerprint": "38c3c134b8682c9b1bf6c65631429f1096f96af59a9c2221e7904ef4b1685cee",
+  "removed_constant_features": [],
+  "removed_correlated_features": [
+    "moisture_ssd",
+    "cumulative_rainfall_ssd",
+    "cumulative_rainfall_ceq",
+    "cumulative_rainfall_eeq",
+    "cumulative_rainfall_jon",
+    "cumulative_rainfall_lak",
+    "cumulative_rainfall_nbg",
+    "cumulative_rainfall_uni",
+    "cumulative_rainfall_upn",
+    "cumulative_rainfall_war",
+    "cumulative_rainfall_wbg",
+    "cumulative_rainfall_weq",
+    "cumulative_rainfall_aby",
+    "rainfall_ssd",
+    "year",
+    "soi_sd",
+    "day_of_year",
+    "rainfall_ssd_cumulative_scaled"
+  ],
+  "selected_feature_names": [
+    "moisture",
+    "moisture_eeq",
+    "moisture_jon",
+    "moisture_lak",
+    "oniANOM",
+    "ninoNINO1+2",
+    "victoria_height_variation",
+    "sin_doy"
+  ],
+  "selection_model_type": "elastic_net"
+}

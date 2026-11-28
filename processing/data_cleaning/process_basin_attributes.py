@@ -130,7 +130,12 @@ def process_basin_attributes(force: bool = False) -> Path | None:
     target_shape = tuple(map(int, cleaning_utils.MASK_REGIONS_REF_SHAPE))
     basins = basins.to_crs(target_crs)
     catchments = catchments.to_crs(target_crs)
-    study_geometry = catchments.geometry.union_all()
+    # GeoPandas <1.0 exposes ``unary_union`` rather than ``union_all``.
+    study_geometry = (
+        catchments.geometry.union_all()
+        if hasattr(catchments.geometry, "union_all")
+        else catchments.geometry.unary_union
+    )
     basins = basins[basins.geometry.notna() & basins.geometry.intersects(study_geometry)].copy()
     basins = basins.drop_duplicates(id_column).reset_index(drop=True)
     if basins.empty:

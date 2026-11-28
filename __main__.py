@@ -15,8 +15,8 @@ import numpy as np
 import pandas as pd
 
 from data.stats import gridded_stats
-from model.ablation.area_reconversion import convert_target_fraction_to_km2, target_area_conversion_metadata
-from model.ablation.temporal_deployment import (
+from model.temporal.runtime.area_reconversion import convert_target_fraction_to_km2, target_area_conversion_metadata
+from model.temporal.runtime.temporal_deployment import (
     generate_temporal_forecast,
     load_best_model_row,
     retrain_best_model_on_available_data,
@@ -26,7 +26,12 @@ from model.ablation.temporal_deployment import (
 from explanations.feature_history import export_feature_history_plots
 from processing.data_cleaning.process_ecmwf import process_ecmwf_forecasts
 from processing.config import get_cfg
-from model.data_preflight import audit_temporal_data
+from model.temporal.data.preflight import audit_temporal_data
+from early_action_trigger import (
+    evaluate_early_action_trigger,
+    update_trigger_readme_status,
+)
+from readme_status import update_deployment_readme
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -39,6 +44,32 @@ LOWER_BOUND_FRACTION = f"lower_bound_{FORECAST_INTERVAL_PERCENT}_fraction"
 LOWER_BOUND_KM2 = f"lower_bound_{FORECAST_INTERVAL_PERCENT}_km2"
 UPPER_BOUND_FRACTION = f"upper_bound_{FORECAST_INTERVAL_PERCENT}_fraction"
 UPPER_BOUND_KM2 = f"upper_bound_{FORECAST_INTERVAL_PERCENT}_km2"
+
+
+def check_if_new_data(data_path: str = "data/temporal_data_seasonal_df.csv") -> bool:
+    """Return whether a completed target period is missing from a temporal CSV.
+
+    Kept as a small compatibility API for callers that perform a cheap update
+    check before invoking the full deployment. A missing or empty cache always
+    requires an update.
+    """
+    path = Path(data_path)
+    if not path.exists():
+        return True
+    frame = pd.read_csv(path)
+    if frame.empty:
+        return True
+    date_column = "date" if "date" in frame.columns else frame.columns[0]
+    dates = pd.to_datetime(frame[date_column], errors="coerce").dropna()
+    if dates.empty:
+        return True
+    from processing.cleaning_utils import get_dates_of_interest
+
+    today = pd.Timestamp.today().normalize()
+    candidates = get_dates_of_interest(
+        dates.max().strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")
+    )[1:]
+    return any(pd.Timestamp(value) < today for value in candidates)
 
 
 def _target_display_name(target_column: str) -> str:
@@ -55,16 +86,23 @@ def _target_display_name(target_column: str) -> str:
 def _prediction_output_dir(target_column: str, future_dates: list[pd.Timestamp]) -> Path:
     start = future_dates[0].strftime("%Y-%m-%d")
     end = future_dates[-1].strftime("%Y-%m-%d")
+    region = target_column.removeprefix("percent_inundation_")
+    if region == target_column:
+        region = "national"
     return Path(get_cfg("outputs.root", "predictions")) / (
-        f"temporal_predictions_{target_column}_{start}_to_{end}"
+        f"inundation_predictions_{region}_{start}_to_{end}"
     )
+
+
+def _temporal_output_dir(target_column: str, future_dates: list[pd.Timestamp]) -> Path:
+    return _prediction_output_dir(target_column, future_dates) / "temporal_predictions"
 
 
 def _forecast_window_end_date(date: pd.Timestamp, target_product: str) -> pd.Timestamp:
     date = pd.Timestamp(date)
     product = str(target_product).strip().lower()
 
-    if product in {"viirs", "modis"}:
+    if product == "viirs":
         if date.day <= 1:
             return date.replace(day=11)
         if date.day <= 11:
@@ -86,7 +124,7 @@ def _prediction_title_with_range(bundle) -> str:
 
 def export_model_report(bundle) -> Path:
     """Write model identity, held-out metrics, and runtime retraining metadata."""
-    output_dir = _prediction_output_dir(bundle.target_column, bundle.future_dates)
+    output_dir = _temporal_output_dir(bundle.target_column, bundle.future_dates)
     output_dir.mkdir(parents=True, exist_ok=True)
     row = bundle.model_row
 
@@ -109,6 +147,23 @@ def export_model_report(bundle) -> Path:
             "metrics_by_lead_time",
         }
     }
+    uncertainty_by_lead: dict[str, dict[str, float]] = {}
+    metrics_payload = row.get("metrics_by_lead_time")
+    if metrics_payload:
+        parsed_metrics = json.loads(metrics_payload) if isinstance(metrics_payload, str) else metrics_payload
+        for lead, values in parsed_metrics.items():
+            width_fraction = values.get("ci95_mean_width")
+            width_km2 = (
+                None if width_fraction is None
+                else float(convert_target_fraction_to_km2([width_fraction], bundle.target_column)[0])
+            )
+            uncertainty_by_lead[str(lead)] = {
+                "coverage_95": values.get("calibration"),
+                "calibration_error_95": values.get("calibration_error_95"),
+                "mean_interval_width_fraction": width_fraction,
+                "mean_interval_width_km2": width_km2,
+                "median_interval_width_fraction": values.get("ci95_median_width"),
+            }
 
     report = {
         "model_type": row.get("model_type"),
@@ -123,6 +178,12 @@ def export_model_report(bundle) -> Path:
         "selected_feature_count_by_lead": row.get("selected_feature_count_by_lead"),
         "forecast_horizon_periods": row.get("dataset_forecast_horizon_periods"),
         "test_metrics": metric_keys,
+        "uncertainty_95": {
+            "nominal_coverage": 0.95,
+            "interval": "2.5th to 97.5th predictive percentiles",
+            "lower_bound_clipped_at_zero_km2": True,
+            "by_lead": uncertainty_by_lead,
+        },
         "runtime_retrained_at": row.get("runtime_retrained_at"),
         "runtime_retrained_until_target_date": row.get("runtime_retrained_until_target_date"),
         "runtime_weight_paths_by_lead": row.get("model_weights_path_by_lead"),
@@ -138,7 +199,7 @@ def export_model_report(bundle) -> Path:
 
 
 def export_csv(bundle) -> Path:
-    output_dir = _prediction_output_dir(bundle.target_column, bundle.future_dates)
+    output_dir = _temporal_output_dir(bundle.target_column, bundle.future_dates)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     history_area = convert_target_fraction_to_km2(bundle.history_values_raw, bundle.target_column)
@@ -277,7 +338,7 @@ def update_forecast_performance_csv(bundle) -> Path:
 
 
 def export_graphs(bundle) -> list[Path]:
-    output_dir = _prediction_output_dir(bundle.target_column, bundle.future_dates)
+    output_dir = _temporal_output_dir(bundle.target_column, bundle.future_dates)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     actual_dates = pd.to_datetime(bundle.history_dates)
@@ -348,12 +409,13 @@ def export_graphs(bundle) -> list[Path]:
     leap_after_february = combined["date"].dt.is_leap_year & (combined["date"].dt.dayofyear > 59)
     combined.loc[leap_after_february, "plot_day"] -= 1
 
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12, 8))
     cmap = plt.get_cmap("winter")
     unique_years = sorted(combined["year"].unique())
     current_year = pred_dates.max().year
     lower_series = pd.Series(lower_area, index=pred_dates)
     upper_series = pd.Series(upper_area, index=pred_dates)
+    year_labels: list[dict[str, float | int | str]] = []
 
     for index, year in enumerate(unique_years):
         group = combined[combined["year"] == year]
@@ -367,6 +429,7 @@ def export_graphs(bundle) -> list[Path]:
                     color="#d62728",
                     linewidth=2.0,
                     label="Actual",
+                    zorder=5,
                 )
             if not predicted_group.empty:
                 anchor_day = None
@@ -393,6 +456,7 @@ def export_graphs(bundle) -> list[Path]:
                         linestyle="--",
                         linewidth=2.0,
                         label="_nolegend_",
+                        zorder=5,
                     )
                     pred_line_days = pred_days
                     pred_line_km2 = pred_km2
@@ -413,6 +477,7 @@ def export_graphs(bundle) -> list[Path]:
                     linestyle="--",
                     linewidth=2.0,
                     label="2 month forecast",
+                    zorder=5,
                 )
                 ax.fill_between(
                     fill_days,
@@ -421,13 +486,23 @@ def export_graphs(bundle) -> list[Path]:
                     color="#d62728",
                     alpha=0.18,
                     label=f"{FORECAST_INTERVAL_PERCENT}% confidence interval",
+                    zorder=4,
                 )
+            label_color = "#d62728"
         else:
             color = cmap(index / max(len(unique_years) - 1, 1))
-            ax.plot(group["plot_day"], group["km2"], color=color, alpha=0.7)
+            ax.plot(group["plot_day"], group["km2"], color=color, alpha=0.7, zorder=2)
+            label_color = color
 
         end_row = group.iloc[-1]
-        ax.text(end_row["plot_day"], end_row["km2"], str(year), fontsize=9, va="center")
+        year_labels.append(
+            {
+                "year": int(year),
+                "x": float(end_row["plot_day"]),
+                "y": float(end_row["km2"]),
+                "color": label_color,
+            }
+        )
 
     ax.set_title(f"{prediction_title}, Year-by-Year Comparison")
     ax.set_xlabel("Month of Year")
@@ -435,7 +510,47 @@ def export_graphs(bundle) -> list[Path]:
     ax.yaxis.set_major_formatter(StrMethodFormatter("{x:,.0f}"))
     month_starts = pd.date_range("2001-01-01", "2001-12-01", freq="MS")
     month_days = month_starts.dayofyear.to_numpy()
-    ax.set_xlim(1, 365)
+    # Reserve a right-hand lane for year labels. Distribute their y positions
+    # so that close seasonal endpoints remain legible, and connect displaced
+    # labels back to the corresponding curve with a subtle leader line.
+    y_min, y_max = ax.get_ylim()
+    y_span = max(y_max - y_min, 1.0)
+    label_gap = y_span * 0.035
+    ordered_labels = sorted(year_labels, key=lambda item: float(item["y"]))
+    label_positions: list[float] = []
+    for item in ordered_labels:
+        label_y = max(float(item["y"]), label_positions[-1] + label_gap) if label_positions else float(item["y"])
+        label_positions.append(label_y)
+    if label_positions and label_positions[-1] > y_max:
+        shift = label_positions[-1] - y_max
+        label_positions = [position - shift for position in label_positions]
+    if label_positions and label_positions[0] < y_min:
+        shift = y_min - label_positions[0]
+        label_positions = [position + shift for position in label_positions]
+
+    label_x = 377
+    for item, label_y in zip(ordered_labels, label_positions):
+        is_current = int(item["year"]) == current_year
+        ax.annotate(
+            str(item["year"]),
+            xy=(float(item["x"]), float(item["y"])),
+            xytext=(label_x, label_y),
+            color=item["color"],
+            fontsize=10 if is_current else 9,
+            fontweight="bold" if is_current else "normal",
+            ha="left",
+            va="center",
+            zorder=10 if is_current else 6,
+            arrowprops={
+                "arrowstyle": "-",
+                "color": item["color"],
+                "alpha": 0.8 if is_current else 0.5,
+                "linewidth": 1.2 if is_current else 0.7,
+            },
+            annotation_clip=False,
+        )
+
+    ax.set_xlim(1, 405)
     ax.set_xticks(month_days)
     ax.set_xticklabels(month_starts.strftime("%b"))
     ax.grid(True, alpha=0.25)
@@ -489,13 +604,42 @@ def main() -> None:
         bundle = generate_temporal_forecast(runtime_row)
 
         csv_path = export_csv(bundle)
+        trigger_result = None
+        if bool(get_cfg("early_action_trigger.enabled", True)):
+            trigger_target = str(get_cfg(
+                "early_action_trigger.target_column", "percent_inundation_ssd"
+            ))
+            if bundle.target_column == trigger_target:
+                trigger_result = evaluate_early_action_trigger(
+                    history_dates=bundle.history_dates,
+                    history_values=bundle.history_values_raw,
+                    forecast_dates=bundle.future_dates,
+                    forecast_values=bundle.predicted_raw,
+                    output_dir=_temporal_output_dir(bundle.target_column, bundle.future_dates),
+                )
+                if trigger_result.activated:
+                    logging.warning("EARLY ACTION TRIGGER ACTIVATED: %s", trigger_result.message)
+                else:
+                    logging.info(
+                        "Early-action trigger inactive: maximum forecast increase=%s; "
+                        "moderate threshold=%s.",
+                        "not evaluable" if trigger_result.increase_fraction is None
+                        else f"{100.0 * trigger_result.increase_fraction:.1f}%",
+                        "not evaluable" if "moderate" not in trigger_result.thresholds
+                        else f"{100.0 * trigger_result.thresholds['moderate']:.1f}%",
+                    )
+            else:
+                logging.warning(
+                    "Early-action trigger not evaluated: forecast target %s does not match %s.",
+                    bundle.target_column, trigger_target,
+                )
         model_report_path = export_model_report(bundle)
         shap_paths = []
         try:
             from explanations.shap_explanations import export_lead_waterfall_plots
             shap_paths = export_lead_waterfall_plots(
                 runtime_row,
-                _prediction_output_dir(bundle.target_column, bundle.future_dates),
+                _temporal_output_dir(bundle.target_column, bundle.future_dates),
             )
         except Exception as exc:
             logging.warning(
@@ -504,7 +648,7 @@ def main() -> None:
             )
         feature_history_paths = export_feature_history_plots(
             runtime_row,
-            _prediction_output_dir(bundle.target_column, bundle.future_dates),
+            _temporal_output_dir(bundle.target_column, bundle.future_dates),
         )
         performance_path = update_forecast_performance_csv(bundle)
         graph_paths = export_graphs(bundle)
@@ -526,9 +670,21 @@ def main() -> None:
         for graph_path in graph_paths:
             logging.info("Graph written to %s", graph_path)
 
-        from model.make_spatial_prediction import run_operational_spatial_analysis
-        spatial_paths = run_operational_spatial_analysis(csv_path)
+        from model.spatial.make_spatial_prediction import run_operational_spatial_analysis
+        prediction_root = _prediction_output_dir(bundle.target_column, bundle.future_dates)
+        spatial_paths = run_operational_spatial_analysis(csv_path, prediction_root=prediction_root)
         logging.info("Spatial prediction outputs written: %d", len(spatial_paths))
+        if trigger_result is not None:
+            update_trigger_readme_status(trigger_result)
+        update_deployment_readme(
+            model_row=runtime_row,
+            target_column=bundle.target_column,
+            origin_date=pd.Timestamp(bundle.origin_date).date().isoformat(),
+            future_dates=[pd.Timestamp(value).date().isoformat() for value in bundle.future_dates],
+            output_dir=_prediction_output_dir(bundle.target_column, bundle.future_dates),
+            graph_paths=graph_paths,
+            spatial_output_count=len(spatial_paths),
+        )
 
     except Exception as exc:
         logging.exception("Error occurred while exporting temporal predictions: %s", exc)

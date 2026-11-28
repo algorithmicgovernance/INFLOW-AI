@@ -1,0 +1,63 @@
+{
+  "best_k": 16,
+  "configuration_signature": {
+    "autoregressive": false,
+    "feature_block_name": "no_feature_lags",
+    "include_ecmwf_hindcasts": true,
+    "include_feature_lag_features": false,
+    "include_target_lag_features": true,
+    "inundation_product": "viirs",
+    "lead_period": 6,
+    "target_type": "first_differenced",
+    "training_cutoff_date": "2018-01-01"
+  },
+  "cv_mean_mae_by_k": {
+    "127": 0.0016426231401662033,
+    "16": 0.0016424792896335323,
+    "32": 0.0016424792896335323,
+    "8": 0.0016512916966651876
+  },
+  "dataset_fingerprint": "1429cdc8e0657ede98adcd08ad465a0d4fb44c0717e6ad1c6104cceb2589d239",
+  "removed_constant_features": [],
+  "removed_correlated_features": [
+    "ecmwf_rainfall_lak_lead_3",
+    "ecmwf_rainfall_lak_lead_4",
+    "moisture_ssd",
+    "cumulative_rainfall_ssd",
+    "cumulative_rainfall_ceq",
+    "cumulative_rainfall_eeq",
+    "cumulative_rainfall_jon",
+    "cumulative_rainfall_lak",
+    "cumulative_rainfall_nbg",
+    "cumulative_rainfall_uni",
+    "cumulative_rainfall_upn",
+    "cumulative_rainfall_war",
+    "cumulative_rainfall_wbg",
+    "cumulative_rainfall_weq",
+    "cumulative_rainfall_aby",
+    "rainfall_ssd",
+    "year",
+    "soi_sd",
+    "day_of_year",
+    "rainfall_ssd_cumulative_scaled"
+  ],
+  "selected_feature_names": [
+    "ecmwf_rainfall_upn_lead_3",
+    "ecmwf_rainfall_war_lead_3",
+    "ecmwf_rainfall_wbg_lead_3",
+    "ecmwf_rainfall_weq_lead_3",
+    "ecmwf_rainfall_aby_lead_3",
+    "ecmwf_rainfall_lead_4",
+    "ecmwf_rainfall_ceq_lead_4",
+    "ecmwf_rainfall_jon_lead_4",
+    "rainfall_upn",
+    "ninoNINO4",
+    "dmi",
+    "cos_doy",
+    "CHIRPS_cumulative_scaled",
+    "CHIRPS_cumulative_cumulative_scaled",
+    "TAMSAT_cumulative_cumulative_scaled",
+    "rainfall_jon_cumulative_scaled"
+  ],
+  "selection_model_type": "elastic_net"
+}

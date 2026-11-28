@@ -44,7 +44,7 @@ EXTRACTED_DOMAIN_PATH = get_cfg("paths.downloads.extracted_domain", "data/downlo
 GR_RAINFALL_DEKADS_PATH = get_cfg("paths.downloads.tamsat_rfe_dekads", "data/downloads/tamsat/rfe/dekads")
 GR_RAINFALL_TEMPORAL_PATH = cleaning_utils.get_target_historic_path("gridded_rainfall_temporal.csv")
 GR_RAINFALL_H5_PATH = cleaning_utils.get_target_historic_path("gridded_rainfall.h5")
-SAMPLE_TIF_FOLDER = get_cfg("paths.downloads.inundation_modis", "data/downloads/inundation_masks_modis")
+SAMPLE_TIF_FOLDER = get_cfg("paths.downloads.inundation_viirs", "data/downloads/inundation_masks_viirs_v2")
 CATCHMENTS_PATH = get_cfg("paths.maps.catchments", "data/maps/inflow_catchments/INFLOW_all_cmts.shp")
 
 
@@ -169,7 +169,7 @@ def _get_valid_rainfall_netcdf(extract_folder, required_start=None, required_end
     )
 
 
-def group_dates_by_decade(dates, target_product='modis'):
+def group_dates_by_decade(dates, target_product='viirs'):
     """
     Group dates into 10-day intervals (dekads).
 
@@ -182,7 +182,7 @@ def group_dates_by_decade(dates, target_product='modis'):
     return cleaning_utils.group_dates_by_target_period(dates, target_product=target_product)
 
 
-def export_decadal_geotiffs(extract_folder, output_folder, target_product='modis'):
+def export_decadal_geotiffs(extract_folder, output_folder, target_product='viirs'):
     """
     Export rainfall data grouped by dekads into GeoTIFF files.
 

@@ -19,3 +19,8 @@ def test_region_codes_are_expanded_before_lag_label():
 
 def test_unmapped_names_are_still_readable():
     assert human_readable_variable_name("day_of_year", "viirs") == "Day of year"
+
+
+def test_day_of_year_cycle_uses_one_climatology_label():
+    assert human_readable_variable_name("sin_doy", "viirs") == "Seasonal climatology"
+    assert human_readable_variable_name("cos_doy", "viirs") == "Seasonal climatology"

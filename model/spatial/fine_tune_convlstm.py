@@ -23,10 +23,10 @@ def main() -> None:
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     source = args.source or get_cfg(
-        "spatial_fine_tuning.source_model_path", "model/spatial_model.keras"
+        "spatial_fine_tuning.source_model_path", "model/spatial/spatial_model.keras"
     )
     output = args.output or get_cfg(
-        "spatial_fine_tuning.output_model_path", "model/spatial_model.keras"
+        "spatial_fine_tuning.output_model_path", "model/spatial/spatial_model.keras"
     )
     train(output=str(output), fine_tune_from=str(source))
 

@@ -31,6 +31,8 @@ VARIABLE_NAME_MAP = {
     "dmi": "Dipole Mode Index",
     "wtio": "Western Tropical Indian Ocean index",
     "setio": "Southeastern Tropical Indian Ocean index",
+    "sin_doy": "Seasonal climatology",
+    "cos_doy": "Seasonal climatology",
 }
 
 REGION_CODE_TO_NAME = {code: name for name, code in region_to_code_dict.items()}

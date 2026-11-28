@@ -9,8 +9,8 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-import model.ablation.feature_selection as feature_selection
-from model.ablation.temporal_data_pipeline import (
+import model.temporal.ablation.feature_selection as feature_selection
+from model.temporal.ablation.temporal_data_pipeline import (
     _add_optional_feature_blocks,
     _ecmwf_leads,
 )
@@ -132,7 +132,7 @@ def test_feature_lags_are_created_without_dataframe_fragmentation_warning(monkey
         **{f"feature_{index}": np.arange(20, dtype=float) for index in range(100)},
     })
     monkeypatch.setattr(
-        "model.ablation.temporal_data_pipeline.get_cfg",
+        "model.temporal.ablation.temporal_data_pipeline.get_cfg",
         lambda key, default=None: {
             "ablation.pipeline.optional_feature_blocks.include_feature_lag_features": True,
             "ablation.pipeline.optional_feature_blocks.calendar": True,
@@ -157,7 +157,7 @@ def test_optional_feature_blocks_replace_existing_calendar_columns(monkeypatch):
         "day_of_year": -1,
     })
     monkeypatch.setattr(
-        "model.ablation.temporal_data_pipeline.get_cfg",
+        "model.temporal.ablation.temporal_data_pipeline.get_cfg",
         lambda key, default=None: {
             "ablation.pipeline.optional_feature_blocks.include_feature_lag_features": False,
             "ablation.pipeline.optional_feature_blocks.calendar": True,

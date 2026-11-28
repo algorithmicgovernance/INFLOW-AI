@@ -1,0 +1,57 @@
+{
+  "best_k": 8,
+  "configuration_signature": {
+    "autoregressive": false,
+    "feature_block_name": "historical_only",
+    "include_ecmwf_hindcasts": false,
+    "include_feature_lag_features": false,
+    "include_target_lag_features": false,
+    "inundation_product": "viirs",
+    "lead_period": 3,
+    "seasonally_standardize_features": true,
+    "target_type": "seasonally_differenced",
+    "training_cutoff_date": "2018-01-01"
+  },
+  "cv_mean_mae_by_k": {
+    "16": 1.492966095606486,
+    "32": 2.054658532142639,
+    "73": 7.522136290868123,
+    "8": 1.428739110628764
+  },
+  "dataset_fingerprint": "911c97805b85c524e31e9ea8846379565794eb6ae4d6298ae491fb1d38481f7e",
+  "removed_constant_features": [
+    "month"
+  ],
+  "removed_correlated_features": [
+    "cumulative_rainfall_ssd",
+    "cumulative_rainfall_ceq",
+    "cumulative_rainfall_eeq",
+    "cumulative_rainfall_jon",
+    "cumulative_rainfall_lak",
+    "cumulative_rainfall_nbg",
+    "cumulative_rainfall_uni",
+    "cumulative_rainfall_upn",
+    "cumulative_rainfall_war",
+    "cumulative_rainfall_wbg",
+    "cumulative_rainfall_weq",
+    "cumulative_rainfall_aby",
+    "year",
+    "oniANOM",
+    "ninoANOM",
+    "ninoANOM.1",
+    "ninoANOM.2",
+    "ninoANOM.3",
+    "soi_sd"
+  ],
+  "selected_feature_names": [
+    "albert_water_level",
+    "moisture",
+    "moisture_lak",
+    "cumulative_rainfall",
+    "TAMSAT_cumulative",
+    "CHIRPS_cumulative",
+    "ninoNINO3.4",
+    "victoria_height_variation"
+  ],
+  "selection_model_type": "elastic_net"
+}

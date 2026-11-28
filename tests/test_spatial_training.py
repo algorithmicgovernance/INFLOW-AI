@@ -4,8 +4,25 @@ from model.spatial.train_convlstm import (
     _sample_index,
     _validate_fine_tuning_model,
 )
-from model.make_spatial_prediction import validate_spatial_model_contract
+import numpy as np
+
+from model.spatial.make_spatial_prediction import generate_flood_mask, validate_spatial_model_contract
 import pytest
+
+
+def test_flood_mask_thresholds_fraction_only_within_requested_domain():
+    probabilities = np.asarray([
+        [0.99, 0.98, 0.50],
+        [0.40, 0.30, 0.20],
+    ])
+    south_sudan = np.asarray([
+        [False, False, True],
+        [True, True, True],
+    ])
+
+    mask = generate_flood_mask(probabilities, 0.5, south_sudan)
+
+    assert mask.tolist() == [[0, 0, 1], [1, 0, 0]]
 
 
 def test_patch_starts_include_grid_edge():

@@ -137,9 +137,10 @@ def _blocks(init, last_valid, product=None):
     """Return four fixed 10-day lead blocks if 40 complete forecast days exist."""
     del product
     init = pd.Timestamp(init).normalize()
-    if init + pd.Timedelta(days=int(LEAD_END_DAYS.max())) > pd.Timestamp(last_valid).normalize():
+    if init + pd.to_timedelta(int(LEAD_END_DAYS.max()), unit="D") > pd.Timestamp(last_valid).normalize():
         return []
-    return [(init + pd.Timedelta(days=int(start)), init + pd.Timedelta(days=int(end)))
+    return [(init + pd.to_timedelta(int(start), unit="D"),
+             init + pd.to_timedelta(int(end), unit="D"))
             for start, end in zip(LEAD_START_DAYS, LEAD_END_DAYS)]
 
 
@@ -256,6 +257,76 @@ def _serialize_runs(runs):
     ]
 
 
+def _duplicate_run_rank(run):
+    """Prefer canonical archive names, then larger files, then stable names."""
+    path = Path(run["path"])
+    lowered = path.stem.lower()
+    duplicate_marker = any(token in lowered for token in ("copy", "duplicate", "dup"))
+    try:
+        size = path.stat().st_size
+    except OSError:
+        size = 0
+    return (duplicate_marker, -size, path.name)
+
+
+def _deduplicate_inventory_runs(runs, source_kind):
+    """Resolve duplicate initializations within one archive deterministically."""
+    by_initialization = {}
+    for run in runs:
+        initialization = run["init"]
+        existing = by_initialization.get(initialization)
+        if existing is None:
+            by_initialization[initialization] = run
+            continue
+        selected, ignored = sorted([existing, run], key=_duplicate_run_rank)
+        by_initialization[initialization] = selected
+        LOG.warning(
+            "Duplicate ECMWF initialization %s in %s: using %s; ignoring %s",
+            initialization.date(), source_kind, selected["path"].name, ignored["path"].name,
+        )
+    return sorted(by_initialization.values(), key=lambda item: item["init"])
+
+
+def _quarantine_corrupt_file(path):
+    """Move a suspect download aside without destroying the original bytes."""
+    path = Path(path)
+    suffix = str(get_cfg("sources.ecmwf.corrupt_file_suffix", ".corrupt"))
+    candidate = path.with_name(path.name + suffix)
+    counter = 2
+    while candidate.exists():
+        candidate = path.with_name(path.name + suffix + f".{counter}")
+        counter += 1
+    path.replace(candidate)
+    LOG.warning("Quarantined corrupt ECMWF file %s as %s", path, candidate)
+    return candidate
+
+
+def _inspect_inventory_file(path, source, source_kind):
+    """Read and validate one file's lightweight run metadata."""
+    with xr.open_dataset(path) as dataset:
+        required = {"tp", "time", "number", "latitude", "longitude"}
+        missing = required.difference(dataset.variables)
+        if missing:
+            raise ValueError(f"{path.name} missing {sorted(missing)}")
+        times = _normalized_times(dataset, source, path)
+        members = int(dataset.sizes["number"])
+    file_runs = []
+    for run_slice in _run_slices(times, source, path):
+        run_times = times[run_slice]
+        if not len(run_times):
+            continue
+        blocks = _blocks(run_times[0], run_times[-1])
+        if blocks:
+            file_runs.append({
+                "init": pd.Timestamp(run_times[0]),
+                "path": path,
+                "blocks": blocks,
+                "ensemble_size": members,
+                "source_kind": source_kind,
+            })
+    return file_runs
+
+
 def _target_periods(product):
     operational_path = get_cfg("runtime.operational_target_temporal_path")
     path = Path(
@@ -281,7 +352,7 @@ def _target_periods(product):
     return periods
 
 
-def _inventory_runs(files, source, source_kind=None, cache_path=None):
+def _inventory_runs(files, source, source_kind=None, cache_path=None, base_url=None):
     """Read only metadata needed to map target periods to forecast runs."""
     source_kind = source_kind or source
     cache_path = Path(cache_path or _inventory_cache_path())
@@ -306,23 +377,30 @@ def _inventory_runs(files, source, source_kind=None, cache_path=None):
             hits += 1
             continue
 
-        with xr.open_dataset(path) as dataset:
-            required = {"tp", "time", "number", "latitude", "longitude"}
-            missing = required.difference(dataset.variables)
-            if missing:
-                raise ValueError(f"{path.name} missing {sorted(missing)}")
-            times = _normalized_times(dataset, source, path)
-            members = int(dataset.sizes["number"])
-        file_runs = []
-        for run_slice in _run_slices(times, source, path):
-            run_times = times[run_slice]
-            if not len(run_times):
+        try:
+            file_runs = _inspect_inventory_file(path, source, source_kind)
+        except Exception as first_error:
+            if not base_url or not bool(get_cfg("sources.ecmwf.redownload_corrupt_files", True)):
+                raise
+            LOG.warning("Invalid ECMWF file %s: %s; attempting redownload", path, first_error)
+            _quarantine_corrupt_file(path)
+            try:
+                download_ecmwf_files(
+                    base_url, path.parent, max_workers=1,
+                    label=f"repair {path.name}",
+                )
+                if not path.exists():
+                    raise FileNotFoundError(f"Redownload did not produce {path.name}")
+                stat = path.stat()
+                file_runs = _inspect_inventory_file(path, source, source_kind)
+            except Exception as repair_error:
+                if path.exists():
+                    _quarantine_corrupt_file(path)
+                LOG.error(
+                    "Skipping corrupt ECMWF file %s after redownload failed: %s",
+                    path.name, repair_error,
+                )
                 continue
-            blocks = _blocks(run_times[0], run_times[-1])
-            if blocks:
-                file_runs.append({"init": pd.Timestamp(run_times[0]), "path": path,
-                                  "blocks": blocks, "ensemble_size": members,
-                                  "source_kind": source_kind})
         runs.extend(file_runs)
         cache["files"][key] = {
             "size": stat.st_size,
@@ -337,11 +415,7 @@ def _inventory_runs(files, source, source_kind=None, cache_path=None):
         "ECMWF inventory: %d cached files, %d new or changed files inspected; cache=%s",
         hits, inspected, cache_path,
     )
-    runs.sort(key=lambda item: item["init"])
-    duplicate_dates = pd.Series([run["init"] for run in runs]).duplicated()
-    if duplicate_dates.any():
-        raise ValueError("Duplicate ECMWF initialization dates found across source files")
-    return runs
+    return _deduplicate_inventory_runs(runs, source_kind)
 
 
 def _merge_runs(*inventories):
@@ -424,6 +498,18 @@ def _backup_path(path):
         candidate = path.with_name(path.name + f".pre-coarse.{counter}.bak")
         counter += 1
     return candidate
+
+
+def _cleanup_obsolete_backups(*paths):
+    """Remove schema-migration backups after replacement outputs succeed."""
+    removed = []
+    for path in (Path(value) for value in paths):
+        pattern = path.name + ".pre-coarse*.bak"
+        for backup in path.parent.glob(pattern):
+            backup.unlink()
+            removed.append(backup)
+            LOG.info("Removed obsolete ECMWF migration backup %s", backup)
+    return removed
 
 
 def _same_timeline(hdf, periods, grid, source_file_count=None):
@@ -634,6 +720,7 @@ def process_ecmwf_forecasts(download_path=None, output_h5=None, output_csv=None,
     product = cleaning_utils.resolve_target_product(
         target_product or get_cfg("runtime.target_product", "viirs"))
     locations = _source_locations(download_path)
+    source_urls = {kind: url for kind, url, _ in locations}
     if not skip_download:
         for kind, url, folder in locations:
             download_ecmwf_files(url, folder, label=kind.replace("_", " "))
@@ -661,7 +748,9 @@ def process_ecmwf_forecasts(download_path=None, output_h5=None, output_csv=None,
     for kind, files in source_files.items():
         if files:
             source = "hindcast" if kind == "hindcast" else "forecast"
-            inventories.append(_inventory_runs(files, source, kind))
+            inventories.append(_inventory_runs(
+                files, source, kind, base_url=source_urls[kind]
+            ))
     runs = _merge_runs(*inventories)
     selected = _select_runs(periods, runs)
     LOG.info("Mapped %d of %d target periods to ECMWF runs on a %dx%d coarse grid",
@@ -670,6 +759,7 @@ def process_ecmwf_forecasts(download_path=None, output_h5=None, output_csv=None,
     _sync_selection(output, selected, len(all_files))
     _process_pending(output, selected, grid)
     _write_temporal_csv_from_hdf5(output, temporal)
+    _cleanup_obsolete_backups(output, temporal)
     LOG.info("ECMWF processing complete: %s and %s", output, temporal)
     return output
 
@@ -688,7 +778,7 @@ def main():
     parser.add_argument("--download-path")
     parser.add_argument("--output-h5")
     parser.add_argument("--output-csv")
-    parser.add_argument("--target-product", choices=["viirs", "modis"])
+    parser.add_argument("--target-product", choices=["viirs"])
     parser.add_argument("--skip-download", action="store_true")
     parser.add_argument("--source", choices=["hindcast", "forecast", "all"], default="all",
                         help="Deprecated: all archives are always combined")
