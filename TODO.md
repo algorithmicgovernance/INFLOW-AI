@@ -19,11 +19,39 @@
 - [x] Test main.py for deployment (1) check it could run if data folder was empty for initial download (just by verifying paths) and (2) run with the current state of the data folder
 
 ## Model Improvements
-- [ ] Add GloFAS data
-- [ ] Improve efficiency of data extraction and training for spatial model
-- [ ] Retrain spatial model and validate using VIIRS data
-- [ ] Train spatial model again on full data set and deploy
-- [ ] Ensure all pipeline parameters are input in the config and not hardcoded
+- [x] Add ECMWF data: incorporate hindcasts into temporal data, retrain temporal  (ensure forecasts are forecasts, and are aligned as such e.g. for the transformer model), evaluate, set up pipeline to work with forecasts; What ECMWF data would be available on a given forecast date?
+- [x] Incorporate the ECMWF hindcasts (from the temporal CSV) into the model training pipeline that currently exists. Ensure the forecasts are treated appropriately by each forecast model. The forecasts should see the entire 40 day window 
+- [x] Why 52 ECMWF candidate features? Shouldn't there only be four? Or are the extra from the subregional ones?
+- [x] Determine why there are two base models and what they do
+- [x] Add transformer model to ablation testing
+- [x] Replace current VIIRS data with data processed by Ross
+- [x] Add ECMWF forecasts from 2025-2026 to training h5, ensure live prediction files can be processed by the operational forecast
+- [x] Ensure operational forecast uses data from the prelim folder
+- [x] Add GloFAS data
+- [x] Improve efficiency of data extraction and training for spatial model
+- [x] Retrain spatial model with VIIRS, ECMWF, and GloFAS
+- [x] Retrain spatial model and validate using VIIRS data
+- [x] Train spatial model again on full data set and deploy
+- [x] Ensure exposure layer is still used and reported on for the spatial model
+- [x] Ensure all pipeline parameters are input in the config and not hardcoded
+- [x] Look for any duplicated files and dead code
+- [x] Update README to accurately descibe current pipeline (ablation, deployment, and config)
+- [x] Write Standard Operating Procedure (run frequency, maintenance, sanity checks, typical error messages, etc.)
+- [x] Re-run ablataion and visualise results as the best model graph used to do (now deleted), this should be an automatic output after running ablation tests
+- [x] Ensure ablation experiments compare to persistence model (target data at t=0) and climatology (average target data at same time period for historic years in training set)
+- [x] Ensure all plots have km^2 as y-axis, not inundation percent (based on South Sudan map)
+- [x] Ensure models outperform persistence
+- [x] Ensure uncertainty is represented by model
+- [x] Implement Bayesian post-processing to reduce confidence interval and correct predictions
+- [x] Add spatial predictions at county level (align to early action trigger for each)
+- [x] Remove all references to MODIS, including in the config and in the data folder (which splits datasets into MODIS-aligned and VIIRS-aligned; MODIS aligned data can simply be removed; processes_inundation_modis.py can be removed etc.); going forward everything is VIIRS by default MODIS will not be used; ensure this does not affect any paths
+- [x] Are the .bak files in the historic data folder artifacts? If so, remove; if they are created by the processing pipeline ensure they are removed after they are no longer necessary
+- [x] Add placeholder trigger with trigger activation display on the README, explain all prediction outputs in table in README, make best temporal model selection rules explicit in the README, ensure README states model performance of currently chosen best model in table format (only the metrics relevant to the best temporal model selection rules), update README to make it clear that ablation is optional if model weights are present in the repo, note that first run is very long in README due to data downloads and processing but this only happens on the first run, make note on how to run model from windows in Github README
+- [x] Test end-to-end pipeline with trained spatial predictions
+- [ ] Push changes to GitHub, merge branch with main, version model
+- [ ] Link spatial model weights, GloFAS layers, and Hydrobasins file to Drive on README so they can be added manually
+- [x] Upload all data and model weights to Google Drive
+- [ ] Dockerise model
 
 ## Major Changes
 - [ ] Implement call to LLM with access to White Nile/South Sudan flooding literature to explain model results and interpret data qualitatively

@@ -6,8 +6,13 @@ joblib==1.5.3
 loguru==0.7.3
 matplotlib==3.10.0
 netCDF4==1.7.2
-numpy>=2.0.0
+# TensorFlow 2.19 requires NumPy <2.2; keep one compatible constraint for the
+# temporal, explanation, and spatial environments.
+numpy>=2.0.0,<2.2.0
 pandas==3.0.1
+Pillow>=10.0.0
+pymc>=5.20.0
+arviz>=0.20.0
 py_hydroweb==1.3.3
 rasterio==1.4.3
 requests==2.32.4
@@ -20,6 +25,7 @@ tensorflow==2.19.0; python_version < "3.13"
 keras>=3.0.0; python_version < "3.13"
 ml-dtypes>=0.5.0
 tqdm>=4.66.0
+torch>=2.6.0
 typer==0.15.1
 wget==3.2
 xarray==2025.1.1

@@ -1,0 +1,222 @@
+{
+  "model_type": "elastic_net",
+  "run_id": "20261127T210332Z",
+  "target_type": "seasonally_differenced",
+  "target_product": "viirs",
+  "explanation_date": "2026-09-11",
+  "lead_count": 6,
+  "contribution_percentages": {
+    "1": [
+      {
+        "feature": "moisture",
+        "absolute_shap_share_percent": 10.887553677374722
+      },
+      {
+        "feature": "moisture_eeq",
+        "absolute_shap_share_percent": 11.48031572091494
+      },
+      {
+        "feature": "moisture_jon",
+        "absolute_shap_share_percent": 1.4952532222550876
+      },
+      {
+        "feature": "moisture_lak",
+        "absolute_shap_share_percent": 4.082826024566314
+      },
+      {
+        "feature": "moisture_war",
+        "absolute_shap_share_percent": 18.80027214930553
+      },
+      {
+        "feature": "oniANOM",
+        "absolute_shap_share_percent": 26.872501796409132
+      },
+      {
+        "feature": "ninoNINO1+2",
+        "absolute_shap_share_percent": 8.048673638816364
+      },
+      {
+        "feature": "sin_doy",
+        "absolute_shap_share_percent": 18.33260377035791
+      }
+    ],
+    "2": [
+      {
+        "feature": "moisture",
+        "absolute_shap_share_percent": 9.806145214278745
+      },
+      {
+        "feature": "moisture_eeq",
+        "absolute_shap_share_percent": 11.549080913986327
+      },
+      {
+        "feature": "moisture_jon",
+        "absolute_shap_share_percent": 2.221746788873467
+      },
+      {
+        "feature": "moisture_lak",
+        "absolute_shap_share_percent": 3.8025224923989667
+      },
+      {
+        "feature": "moisture_war",
+        "absolute_shap_share_percent": 19.537671193531974
+      },
+      {
+        "feature": "oniANOM",
+        "absolute_shap_share_percent": 27.766059952456303
+      },
+      {
+        "feature": "ninoNINO1+2",
+        "absolute_shap_share_percent": 8.195752473738862
+      },
+      {
+        "feature": "sin_doy",
+        "absolute_shap_share_percent": 17.121020970735355
+      }
+    ],
+    "3": [
+      {
+        "feature": "ecmwf_rainfall_ceq_lead_4",
+        "absolute_shap_share_percent": 14.420474130341795
+      },
+      {
+        "feature": "moisture",
+        "absolute_shap_share_percent": 18.548716290008965
+      },
+      {
+        "feature": "moisture_eeq",
+        "absolute_shap_share_percent": 9.339333771804151
+      },
+      {
+        "feature": "moisture_jon",
+        "absolute_shap_share_percent": 1.2938146747925081
+      },
+      {
+        "feature": "moisture_lak",
+        "absolute_shap_share_percent": 3.395386456701825
+      },
+      {
+        "feature": "oniANOM",
+        "absolute_shap_share_percent": 38.12668262513738
+      },
+      {
+        "feature": "ninoNINO1+2",
+        "absolute_shap_share_percent": 10.91446908308087
+      },
+      {
+        "feature": "sin_doy",
+        "absolute_shap_share_percent": 3.9611229681325155
+      }
+    ],
+    "4": [
+      {
+        "feature": "ecmwf_rainfall_ceq_lead_4",
+        "absolute_shap_share_percent": 14.646294605389206
+      },
+      {
+        "feature": "moisture",
+        "absolute_shap_share_percent": 18.30295708888361
+      },
+      {
+        "feature": "moisture_eeq",
+        "absolute_shap_share_percent": 7.38977870818722
+      },
+      {
+        "feature": "moisture_jon",
+        "absolute_shap_share_percent": 1.352493139071891
+      },
+      {
+        "feature": "moisture_lak",
+        "absolute_shap_share_percent": 3.8185811149478894
+      },
+      {
+        "feature": "oniANOM",
+        "absolute_shap_share_percent": 36.66957931041314
+      },
+      {
+        "feature": "ninoNINO1+2",
+        "absolute_shap_share_percent": 9.982518641559608
+      },
+      {
+        "feature": "sin_doy",
+        "absolute_shap_share_percent": 7.837797391547421
+      }
+    ],
+    "5": [
+      {
+        "feature": "moisture",
+        "absolute_shap_share_percent": 3.8842130975480926
+      },
+      {
+        "feature": "moisture_eeq",
+        "absolute_shap_share_percent": 7.1564065585414
+      },
+      {
+        "feature": "moisture_jon",
+        "absolute_shap_share_percent": 4.534877699803185
+      },
+      {
+        "feature": "moisture_lak",
+        "absolute_shap_share_percent": 3.697336119790686
+      },
+      {
+        "feature": "oniANOM",
+        "absolute_shap_share_percent": 45.11326590166464
+      },
+      {
+        "feature": "ninoNINO1+2",
+        "absolute_shap_share_percent": 10.199061198172544
+      },
+      {
+        "feature": "victoria_height_variation",
+        "absolute_shap_share_percent": 6.074368326725608
+      },
+      {
+        "feature": "sin_doy",
+        "absolute_shap_share_percent": 19.34047109775385
+      }
+    ],
+    "6": [
+      {
+        "feature": "moisture",
+        "absolute_shap_share_percent": 10.243773395181094
+      },
+      {
+        "feature": "moisture_eeq",
+        "absolute_shap_share_percent": 9.05609180770738
+      },
+      {
+        "feature": "moisture_jon",
+        "absolute_shap_share_percent": 7.428100588701512
+      },
+      {
+        "feature": "moisture_lak",
+        "absolute_shap_share_percent": 7.207167114734279
+      },
+      {
+        "feature": "moisture_wbg",
+        "absolute_shap_share_percent": 3.603724637939945
+      },
+      {
+        "feature": "oniANOM",
+        "absolute_shap_share_percent": 46.194649526710776
+      },
+      {
+        "feature": "victoria_height_variation",
+        "absolute_shap_share_percent": 9.458434143636998
+      },
+      {
+        "feature": "sin_doy",
+        "absolute_shap_share_percent": 6.808058785388008
+      }
+    ]
+  },
+  "plots": [
+    "predictions/inundation_predictions_ssd_2026-11-01_to_2026-12-21/temporal_predictions/explanations/shap_waterfall_lead_1.png",
+    "predictions/inundation_predictions_ssd_2026-11-01_to_2026-12-21/temporal_predictions/explanations/shap_waterfall_lead_2.png",
+    "predictions/inundation_predictions_ssd_2026-11-01_to_2026-12-21/temporal_predictions/explanations/shap_waterfall_lead_3.png",
+    "predictions/inundation_predictions_ssd_2026-11-01_to_2026-12-21/temporal_predictions/explanations/shap_waterfall_lead_4.png",
+    "predictions/inundation_predictions_ssd_2026-11-01_to_2026-12-21/temporal_predictions/explanations/shap_waterfall_lead_5.png",
+    "predictions/inundation_predictions_ssd_2026-11-01_to_2026-12-21/temporal_predictions/explanations/shap_waterfall_lead_6.png"
+  ]
+}

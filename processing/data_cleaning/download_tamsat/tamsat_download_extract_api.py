@@ -9,11 +9,68 @@ import os
 import wget
 import numpy as np
 import xarray as xr
+import netCDF4 as nc
 import itertools
 import pandas as pd
 import calendar
 from datetime import datetime as dt
 from datetime import timedelta as td
+
+
+def _append_domain_file(source_path, output_path, bounds, resolution):
+    """Append one spatially subset source file to an unlimited-time NetCDF."""
+    north, south, west, east = bounds
+    with xr.open_dataset(source_path) as source:
+        if str(resolution) == "0.0375":
+            subset = source.sel(lon=slice(west, east), lat=slice(north, south))
+        else:
+            subset = source.sel(lon=slice(west, east), lat=slice(south, north))
+        # Materialize only this source file before its backend is closed.
+        subset.load()
+
+    if not os.path.exists(output_path):
+        subset.to_netcdf(output_path, engine="netcdf4", unlimited_dims=["time"])
+        return
+
+    with nc.Dataset(output_path, "a") as destination:
+        if "time" not in destination.dimensions or not destination.dimensions["time"].isunlimited():
+            raise RuntimeError("Incremental domain output requires an unlimited time dimension")
+        offset = len(destination.dimensions["time"])
+        count = int(subset.sizes.get("time", 0))
+        if count == 0:
+            return
+
+        time_var = destination.variables["time"]
+        calendar_name = getattr(time_var, "calendar", "standard")
+        timestamps = pd.to_datetime(subset["time"].values).to_pydatetime()
+        time_var[offset:offset + count] = nc.date2num(
+            timestamps,
+            units=time_var.units,
+            calendar=calendar_name,
+        )
+
+        for name, variable in subset.variables.items():
+            if name == "time" or "time" not in variable.dims:
+                continue
+            target = destination.variables[name]
+            slices = [slice(None)] * variable.ndim
+            time_axis = variable.dims.index("time")
+            slices[time_axis] = slice(offset, offset + count)
+            target[tuple(slices)] = variable.values
+
+
+def _write_domain_incrementally(files, output_path, bounds, resolution):
+    """Create a domain NetCDF without retaining the full time history in RAM."""
+    part_path = output_path + ".part"
+    if os.path.exists(part_path):
+        os.remove(part_path)
+    try:
+        for source_path in files:
+            _append_domain_file(source_path, part_path, bounds, resolution)
+        os.replace(part_path, output_path)
+    finally:
+        if os.path.exists(part_path):
+            os.remove(part_path)
 
 
 def date_df(timestep, startdate, enddate, endmonth):
@@ -784,6 +841,20 @@ def extract(request):
         
         # Extract
         if len(flist_exist) > 0:
+            if extract_type == 'domain':
+                fname = 'TAMSATv' + str(version) + '_' + timestep + '_' + str(resolution) + '_' + str(N) + '_' + str(S) + '_' + str(W) + '_' + str(E) + '_' + startdate + '_' + enddate + '.nc'
+                fname_full = localdata_dir + '/extracted_data/' + extract_type + '/' + fname
+                if not os.path.exists(os.path.dirname(fname_full)):
+                    os.makedirs(os.path.dirname(fname_full))
+                _write_domain_incrementally(
+                    flist_exist,
+                    fname_full,
+                    bounds=(N, S, W, E),
+                    resolution=resolution,
+                )
+                print('Created file: %s' % fname_full)
+                return
+
             ds_list = []
             for file in flist_exist:
                 ds = xr.open_dataset(file)

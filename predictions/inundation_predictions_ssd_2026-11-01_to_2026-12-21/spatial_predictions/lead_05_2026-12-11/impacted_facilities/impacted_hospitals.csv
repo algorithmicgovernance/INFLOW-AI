@@ -1,0 +1,817 @@
+name,latitude,longitude,State,County,Payam,facility_type,worst_case,average_case,best_case
+Abyei Civil Hospital,9.595,28.436,Abyei Administrative Area,Abyei County,Abyei Payam,hospital,stay_dry,stay_dry,stay_dry
+Agany Tok PHCU,9.52756,28.43435,Abyei Administrative Area,Abyei County,Alal Payam,hospital,stay_dry,stay_dry,stay_dry
+Wunpeth PHCU,9.38995,28.55252,Abyei Administrative Area,Abyei County,Mijak Payam,hospital,stay_dry,stay_dry,stay_dry
+Wunchuei PHCU,9.397544,28.674119,Abyei Administrative Area,Abyei County,Rumamer Payam,hospital,stay_dry,stay_dry,stay_dry
+Kuda PHCC,4.85112,31.58531,Central Equatoria State,Juba County,Dolo Payam,hospital,stay_dry,stay_dry,stay_dry
+El-Sabah Children Hospital,4.844289,31.606819,Central Equatoria State,Juba County,Juba Town Payam,hospital,stay_dry,stay_dry,stay_dry
+Juba Teaching Hospital,4.850948,31.608209,Central Equatoria State,Juba County,Juba Town Payam,hospital,stay_dry,stay_dry,stay_dry
+Kator PHCC,4.83108,31.59662,Central Equatoria State,Juba County,Kator Payam,hospital,stay_dry,stay_dry,stay_dry
+Lologo PHCC,4.81729,31.59564,Central Equatoria State,Juba County,Kator Payam,hospital,stay_dry,stay_dry,stay_dry
+Malakia PHCC,4.83763,31.60361,Central Equatoria State,Juba County,Kator Payam,hospital,stay_dry,stay_dry,stay_dry
+Lirya PHCC,4.38563,32.04642,Central Equatoria State,Juba County,Lirya Payam,hospital,stay_dry,stay_dry,stay_dry
+Ngangalla PHCU,4.70646,31.91963,Central Equatoria State,Juba County,Lirya Payam,hospital,stay_dry,stay_dry,stay_dry
+Lobonok PHCC,4.17706,31.37249,Central Equatoria State,Juba County,Lobonok Payam,hospital,stay_dry,stay_dry,stay_dry
+Aru Junction PHCU,4.36354,31.9846,Central Equatoria State,Juba County,Lokiliri Payam,hospital,stay_dry,stay_dry,stay_dry
+Kubi PHCU,4.39024,31.92267,Central Equatoria State,Juba County,Lokiliri Payam,hospital,stay_dry,stay_dry,stay_dry
+Lokiliri PHCC,4.57363,31.93691,Central Equatoria State,Juba County,Lokiliri Payam,hospital,stay_dry,stay_dry,stay_dry
+Mangalla PHCC,5.19657,31.76872,Central Equatoria State,Juba County,Mangala North Payam,hospital,become_wet,stay_dry,stay_dry
+Mogiri/Jobur PHCC,4.88839,31.85532,Central Equatoria State,Juba County,Mangala South Payam,hospital,stay_dry,stay_dry,stay_dry
+Hai Jebel PHCU,4.848152,31.58016,Central Equatoria State,Juba County,Munuki Payam,hospital,stay_dry,stay_dry,stay_dry
+Jondoki PHCC,4.9084869,31.5737357,Central Equatoria State,Juba County,Munuki Payam,hospital,stay_dry,stay_dry,stay_dry
+Munuki PHCC,4.86348,31.57933,Central Equatoria State,Juba County,Munuki Payam,hospital,stay_dry,stay_dry,stay_dry
+Nyakuron PHCC,4.84602,31.57908,Central Equatoria State,Juba County,Munuki Payam,hospital,stay_dry,stay_dry,stay_dry
+Gurei PHCC,4.86667,31.51851,Central Equatoria State,Juba County,Northern Bari Payam,hospital,stay_dry,stay_dry,stay_dry
+Gumbo PHCC,4.8149,31.62267,Central Equatoria State,Juba County,Rejaf Payam,hospital,stay_dry,stay_dry,stay_dry
+Khor Romula/Jenduru PHCU,4.793725,31.591965,Central Equatoria State,Juba County,Rejaf Payam,hospital,stay_dry,stay_dry,stay_dry
+Rajaf East PHCC,4.69851,31.29396,Central Equatoria State,Juba County,Rejaf Payam,hospital,stay_dry,stay_dry,stay_dry
+Rokon PHCC,5.13037,30.94164,Central Equatoria State,Juba County,Rokon Payam,hospital,stay_dry,stay_dry,stay_dry
+Wonduruba PHCC,4.54572,33.0033,Central Equatoria State,Juba County,Wonduruba Payam,hospital,stay_dry,stay_dry,stay_dry
+Litoba PHCU,3.738447,31.683778,Central Equatoria State,Kajo-Keji County,Kangapo One Payam,hospital,stay_dry,stay_dry,stay_dry
+Mere PHCU,3.88952,31.67249,Central Equatoria State,Kajo-Keji County,Lire Payam,hospital,stay_dry,stay_dry,stay_dry
+Kansuk PHCC,4.01094,31.53514,Central Equatoria State,Kajo-Keji County,Nyepo Payam,hospital,stay_dry,stay_dry,stay_dry
+Kenyi PHCU,4.20651,30.91298,Central Equatoria State,Lainya County,Kenyi Payam,hospital,stay_dry,stay_dry,stay_dry
+Limbe PHCC,4.16106,30.86092,Central Equatoria State,Lainya County,Kenyi Payam,hospital,stay_dry,stay_dry,stay_dry
+Jamara PHCC,4.04734,30.98237,Central Equatoria State,Lainya County,Kupera Payam,hospital,stay_dry,stay_dry,stay_dry
+Lainya Hospital,4.34059,31.07442,Central Equatoria State,Lainya County,Lainya Payam,hospital,stay_dry,stay_dry,stay_dry
+Logwili PHCU,4.37008,31.12116,Central Equatoria State,Lainya County,Lainya Payam,hospital,stay_dry,stay_dry,stay_dry
+Wuji PHCC,3.84054,31.07676,Central Equatoria State,Lainya County,Wuji Payam,hospital,stay_dry,stay_dry,stay_dry
+Morobo PHCC,3.68784,30.77521,Central Equatoria State,Morobo County,Gulumbi Payam,hospital,stay_dry,stay_dry,stay_dry
+Rodoba PHCU,3.6001,30.80723,Central Equatoria State,Morobo County,Gulumbi Payam,hospital,stay_dry,stay_dry,stay_dry
+Kaya PHCC,3.54158,30.88163,Central Equatoria State,Morobo County,Kimba Payam,hospital,stay_dry,stay_dry,stay_dry
+Gemeiza PHCU,5.68,31.7978,Central Equatoria State,Terekeka County,Gameiza Payam,hospital,become_wet,stay_dry,stay_dry
+Wanyang PHCU,5.38251,31.68027,Central Equatoria State,Terekeka County,Gameiza Payam,hospital,stay_dry,stay_dry,stay_dry
+Muni PHCC,5.64397,31.72024,Central Equatoria State,Terekeka County,Muni Payam,hospital,stay_dry,stay_dry,stay_dry
+Kuda PHCU,5.1429,31.7125,Central Equatoria State,Terekeka County,Nyori Payam,hospital,stay_dry,stay_dry,stay_dry
+Moridi PHCU,5.49009,31.6176,Central Equatoria State,Terekeka County,Nyori Payam,hospital,stay_dry,stay_dry,stay_dry
+Kwornyang PHCU,5.54322,31.54302,Central Equatoria State,Terekeka County,Reggo Payam,hospital,stay_dry,stay_dry,stay_dry
+Lengi PHCU,5.2846,31.4216,Central Equatoria State,Terekeka County,Reggo Payam,hospital,stay_dry,stay_dry,stay_dry
+Lojora PHCU,5.38218,31.68012,Central Equatoria State,Terekeka County,Reggo Payam,hospital,stay_dry,stay_dry,stay_dry
+Jonkok PHCU,5.29163,31.02493,Central Equatoria State,Terekeka County,Rijong Payam,hospital,stay_dry,stay_dry,stay_dry
+Kowori PHCU,5.39407,31.1092,Central Equatoria State,Terekeka County,Rijong Payam,hospital,stay_dry,stay_dry,stay_dry
+Rijong PHCC,5.39385,31.16922,Central Equatoria State,Terekeka County,Rijong Payam,hospital,stay_dry,stay_dry,stay_dry
+Atiit PHCU,5.89566,30.77165,Central Equatoria State,Terekeka County,Tali Payam,hospital,stay_dry,stay_dry,stay_dry
+Kirot nyumbo PHCU,5.609374,31.033016,Central Equatoria State,Terekeka County,Tali Payam,hospital,stay_dry,stay_dry,stay_dry
+Kiu/Kiyu PHCU,6.20479,30.60062,Central Equatoria State,Terekeka County,Tali Payam,hospital,stay_dry,stay_dry,stay_dry
+Makido PHCU,5.96283,30.74117,Central Equatoria State,Terekeka County,Tali Payam,hospital,stay_dry,stay_dry,stay_dry
+Tali PHCC,5.89754,30.77169,Central Equatoria State,Terekeka County,Tali Payam,hospital,stay_dry,stay_dry,stay_dry
+Terekeka County Hospital,5.438372,31.745791,Central Equatoria State,Terekeka County,Terekeka Payam,hospital,become_wet,stay_dry,stay_dry
+Mundari Bura PHCC,5.67265,30.97458,Central Equatoria State,Terekeka County,Tindilo Payam,hospital,stay_dry,stay_dry,stay_dry
+Peri PHCU,5.60376,31.82794,Central Equatoria State,Terekeka County,Tindilo Payam,hospital,become_wet,stay_dry,stay_dry
+Tombek PHCC,5.81126,31.68499,Central Equatoria State,Terekeka County,Tombek Payam,hospital,become_wet,stay_dry,stay_dry
+Pisak PHCU,4.15092,30.52611,Central Equatoria State,Yei County,Lasu Payam,hospital,stay_dry,stay_dry,stay_dry
+Mugwo PHCC,3.889823,30.74011,Central Equatoria State,Yei County,Mugwo Payam,hospital,stay_dry,stay_dry,stay_dry
+Goja PHCU,4.0064,30.63631,Central Equatoria State,Yei County,Otogo Payam,hospital,stay_dry,stay_dry,stay_dry
+Martha PHCC,4.097428,30.667819,Central Equatoria State,Yei County,Yei Town Payam,hospital,stay_dry,stay_dry,stay_dry
+Minyori PHCU,4.12528,30.62005,Central Equatoria State,Yei County,Yei Town Payam,hospital,stay_dry,stay_dry,stay_dry
+St Bakhita PHCC,4.103195,30.632383,Central Equatoria State,Yei County,Yei Town Payam,hospital,stay_dry,stay_dry,stay_dry
+Yei Civil Hospital,4.09133,30.6756,Central Equatoria State,Yei County,Yei Town Payam,hospital,stay_dry,stay_dry,stay_dry
+Kimotong PHCC,4.6849,33.26397,Eastern Equatoria State,Budi County,Kimotong Payam,hospital,stay_dry,stay_dry,stay_dry
+Chukudum  Hospital,4.22797,33.48606,Eastern Equatoria State,Budi County,Komori Payam,hospital,stay_dry,stay_dry,stay_dry
+Komiri PHCC,4.227561,33.492839,Eastern Equatoria State,Budi County,Komori Payam,hospital,stay_dry,stay_dry,stay_dry
+FRAK-SIKA PHCU,4.38266,33.34868,Eastern Equatoria State,Budi County,Loriyok Payam,hospital,stay_dry,stay_dry,stay_dry
+Loriyok PHCU,4.51921,33.32309,Eastern Equatoria State,Budi County,Loriyok Payam,hospital,stay_dry,stay_dry,stay_dry
+Kikilai PHCC,4.13318,33.6022,Eastern Equatoria State,Budi County,Lotukei Payam,hospital,stay_dry,stay_dry,stay_dry
+Lorema PHCC,4.16063,33.66069,Eastern Equatoria State,Budi County,Lotukei Payam,hospital,stay_dry,stay_dry,stay_dry
+Piobokoi PHCU,4.08498,33.75889,Eastern Equatoria State,Budi County,Lotukei Payam,hospital,stay_dry,stay_dry,stay_dry
+Kapeta PHCU,4.3092,33.64248,Eastern Equatoria State,Budi County,Loudo Payam,hospital,stay_dry,stay_dry,stay_dry
+Ngatuba PHCU,4.25673,33.69916,Eastern Equatoria State,Budi County,Loudo Payam,hospital,stay_dry,stay_dry,stay_dry
+Nagishot PHCC,4.26734,33.56633,Eastern Equatoria State,Budi County,Nagishot Payam,hospital,stay_dry,stay_dry,stay_dry
+Chawa PHCU,4.73338,33.24401,Eastern Equatoria State,Budi County,Napak Payam,hospital,stay_dry,stay_dry,stay_dry
+Kibongorok PHCU,4.40211,33.52178,Eastern Equatoria State,Budi County,Ngauro Payam,hospital,stay_dry,stay_dry,stay_dry
+Ngauro PHCC,4.22842,33.4849,Eastern Equatoria State,Budi County,Ngauro Payam,hospital,stay_dry,stay_dry,stay_dry
+Tulugi PHCU,4.35017,33.62521,Eastern Equatoria State,Budi County,Ngauro Payam,hospital,stay_dry,stay_dry,stay_dry
+Hatire PHCC,4.033623,32.823727,Eastern Equatoria State,Ikotos County,Hatire Payam,hospital,stay_dry,stay_dry,stay_dry
+Imila PHCU,4.167424,32.865797,Eastern Equatoria State,Ikotos County,Hatire Payam,hospital,stay_dry,stay_dry,stay_dry
+Ikwoto PHCC,4.0797,33.09858,Eastern Equatoria State,Ikotos County,Ikotos Payam,hospital,stay_dry,stay_dry,stay_dry
+Tseretenya PHCU,3.83168,33.22004,Eastern Equatoria State,Ikotos County,Ikotos Payam,hospital,stay_dry,stay_dry,stay_dry
+Imotong PHCC,4.17102,32.8418,Eastern Equatoria State,Ikotos County,Imotong Payam,hospital,stay_dry,stay_dry,stay_dry
+Ngaluma PHCU,3.97988,33.06697,Eastern Equatoria State,Ikotos County,Imotong Payam,hospital,stay_dry,stay_dry,stay_dry
+Chahare PHCU,4.28959,33.14447,Eastern Equatoria State,Ikotos County,Lomohidang North Payam,hospital,stay_dry,stay_dry,stay_dry
+St Theresa Isohe Mission Hospital,4.24025,33.07553,Eastern Equatoria State,Ikotos County,Lomohidang North Payam,hospital,stay_dry,stay_dry,stay_dry
+Lodurumo PHCU,4.237011,33.172844,Eastern Equatoria State,Ikotos County,Lomohidang South Payam,hospital,stay_dry,stay_dry,stay_dry
+Lodwara PHCU,4.19423,33.20613,Eastern Equatoria State,Ikotos County,Lomohidang South Payam,hospital,stay_dry,stay_dry,stay_dry
+Okorohore PHCU,4.15718,33.16964,Eastern Equatoria State,Ikotos County,Lomohidang South Payam,hospital,stay_dry,stay_dry,stay_dry
+Biira PHCC,3.83313,33.58209,Eastern Equatoria State,Ikotos County,Losite Payam,hospital,stay_dry,stay_dry,stay_dry
+Lofus PHCU,3.80408,33.43435,Eastern Equatoria State,Ikotos County,Losite Payam,hospital,stay_dry,stay_dry,stay_dry
+Lowoyakali PHCU,4.67819,33.81587,Eastern Equatoria State,Kapoeta East County,Katodori Payam,hospital,stay_dry,stay_dry,stay_dry
+NAPOTPOT (Loburi) PHCU,4.62665,33.89911,Eastern Equatoria State,Kapoeta East County,Katodori Payam,hospital,stay_dry,stay_dry,stay_dry
+Kuron PHCC,5.70488,34.56504,Eastern Equatoria State,Kapoeta East County,Kauto Payam,hospital,stay_dry,stay_dry,stay_dry
+NAMORUPUS PHCU,5.47083,34.64701,Eastern Equatoria State,Kapoeta East County,Kauto Payam,hospital,stay_dry,stay_dry,stay_dry
+LOTIMOR PHCU,5.310038,35.074905,Eastern Equatoria State,Kapoeta East County,Lotimor Payam,hospital,stay_dry,stay_dry,stay_dry
+Mogos PHCC,5.12477,33.7906,Eastern Equatoria State,Kapoeta East County,Mogos Payam,hospital,stay_dry,stay_dry,stay_dry
+Nasigigriate PHCU,4.97525,33.69908,Eastern Equatoria State,Kapoeta East County,Mogos Payam,hospital,stay_dry,stay_dry,stay_dry
+Loolim PHCU,4.58788,34.04496,Eastern Equatoria State,Kapoeta East County,Narus Payam,hospital,stay_dry,stay_dry,stay_dry
+Nadapal PHCU,4.448731,34.184503,Eastern Equatoria State,Kapoeta East County,Narus Payam,hospital,stay_dry,stay_dry,stay_dry
+Narus CDoT PHCC,4.50478,34.17014,Eastern Equatoria State,Kapoeta East County,Narus Payam,hospital,stay_dry,stay_dry,stay_dry
+Narus PHCC,4.50338,34.16179,Eastern Equatoria State,Kapoeta East County,Narus Payam,hospital,stay_dry,stay_dry,stay_dry
+New Site Wodran PHCC,4.25042,34.00154,Eastern Equatoria State,Kapoeta East County,Natinga Payam,hospital,stay_dry,stay_dry,stay_dry
+Chumakori PHCU,4.91333,33.55849,Eastern Equatoria State,Kapoeta North County,Chumakori Payam,hospital,stay_dry,stay_dry,stay_dry
+Kibak PHCU,4.995578,33.579274,Eastern Equatoria State,Kapoeta North County,Karukomuge Payam,hospital,stay_dry,stay_dry,stay_dry
+Lokoges PHCU,5.049,33.3049,Eastern Equatoria State,Kapoeta North County,Karukomuge Payam,hospital,stay_dry,stay_dry,stay_dry
+Naakwa PHCC,5.06715,33.55346,Eastern Equatoria State,Kapoeta North County,Karukomuge Payam,hospital,stay_dry,stay_dry,stay_dry
+Lomeyen PHCU,4.90765,33.45101,Eastern Equatoria State,Kapoeta North County,Lomeyen Payam,hospital,stay_dry,stay_dry,stay_dry
+Mossingo PHCU,5.267482,33.771244,Eastern Equatoria State,Kapoeta North County,Mosingo Payam,hospital,stay_dry,stay_dry,stay_dry
+Nangoletirae PHCU,4.89588,33.49577,Eastern Equatoria State,Kapoeta North County,Najie Payam,hospital,stay_dry,stay_dry,stay_dry
+Riwoto PHCC,4.88217,33.50584,Eastern Equatoria State,Kapoeta North County,Najie Payam,hospital,stay_dry,stay_dry,stay_dry
+Choroi PHCU,4.88719,33.60092,Eastern Equatoria State,Kapoeta North County,Paringa Payam,hospital,stay_dry,stay_dry,stay_dry
+PARINGA PHCU,4.84784,33.56327,Eastern Equatoria State,Kapoeta North County,Paringa Payam,hospital,stay_dry,stay_dry,stay_dry
+Kapoeta Civil Hospital,4.77239,33.59156,Eastern Equatoria State,Kapoeta South County,Kapoeta Town Payam,hospital,stay_dry,stay_dry,stay_dry
+Longeleya PHCU,4.701444,33.633778,Eastern Equatoria State,Kapoeta South County,Longeleya Payam,hospital,stay_dry,stay_dry,stay_dry
+Nachilagur PHCU,4.7536,33.6058,Eastern Equatoria State,Kapoeta South County,Machi I Payam,hospital,stay_dry,stay_dry,stay_dry
+Nakware PHCU,4.774,33.500417,Eastern Equatoria State,Kapoeta South County,Machi II Payam,hospital,stay_dry,stay_dry,stay_dry
+Nak Nak PHCU,4.753361,33.662867,Eastern Equatoria State,Kapoeta South County,Pwata Payam,hospital,stay_dry,stay_dry,stay_dry
+Napetait PHCC,4.625861,33.656833,Eastern Equatoria State,Kapoeta South County,Pwata Payam,hospital,stay_dry,stay_dry,stay_dry
+Imedu PHCU,4.913181,32.677192,Eastern Equatoria State,Lafon County,Arihilo Payam,hospital,stay_dry,stay_dry,stay_dry
+Lacharok PHCU,4.86697,32.70185,Eastern Equatoria State,Lafon County,Arihilo Payam,hospital,stay_dry,stay_dry,stay_dry
+Logonowati PHCU,4.84137,32.69088,Eastern Equatoria State,Lafon County,Arihilo Payam,hospital,stay_dry,stay_dry,stay_dry
+Lafon PHCC,5.03039,32.476115,Eastern Equatoria State,Lafon County,Burgilo Payam,hospital,stay_dry,stay_dry,stay_dry
+Imehejek Hospital,4.78175,32.76149,Eastern Equatoria State,Lafon County,Imehejek Payam,hospital,stay_dry,stay_dry,stay_dry
+AIC Lohutok PHCC,4.642398,32.85622,Eastern Equatoria State,Lafon County,Lohutok Payam,hospital,stay_dry,stay_dry,stay_dry
+Ibonni PHCU,4.661957,32.796646,Eastern Equatoria State,Lafon County,Lohutok Payam,hospital,stay_dry,stay_dry,stay_dry
+Lalanga PHCU,4.59091,32.90335,Eastern Equatoria State,Lafon County,Lohutok Payam,hospital,stay_dry,stay_dry,stay_dry
+Bule PHCU,4.901303,32.618125,Eastern Equatoria State,Lafon County,Longiro Payam,hospital,stay_dry,stay_dry,stay_dry
+Haba PHCU,4.83781,32.62203,Eastern Equatoria State,Lafon County,Longiro Payam,hospital,stay_dry,stay_dry,stay_dry
+Idali PHCU,4.70395,32.68326,Eastern Equatoria State,Lafon County,Longiro Payam,hospital,stay_dry,stay_dry,stay_dry
+Longiro PHCU,4.78893,32.6278,Eastern Equatoria State,Lafon County,Longiro Payam,hospital,stay_dry,stay_dry,stay_dry
+Ukwanya PHCU,5.094514,32.480869,Eastern Equatoria State,Lafon County,Marguna Payam,hospital,stay_dry,stay_dry,stay_dry
+Pachidi/Lwala PHCU,4.80568,32.47657,Eastern Equatoria State,Lafon County,Pacidi Payam,hospital,stay_dry,stay_dry,stay_dry
+Upuo PHCU,4.78606,32.43223,Eastern Equatoria State,Lafon County,Pacidi Payam,hospital,stay_dry,stay_dry,stay_dry
+Kicenga PHCC,3.877638,32.626849,Eastern Equatoria State,Magwi County,Lobone Payam,hospital,stay_dry,stay_dry,stay_dry
+Lobone PHCC,3.79789,32.76134,Eastern Equatoria State,Magwi County,Lobone Payam,hospital,stay_dry,stay_dry,stay_dry
+Palwar PHCU,3.9175,32.59803,Eastern Equatoria State,Magwi County,Lobone Payam,hospital,stay_dry,stay_dry,stay_dry
+Abara PHCC,4.082614,32.178892,Eastern Equatoria State,Magwi County,Magwi Payam,hospital,stay_dry,stay_dry,stay_dry
+Magwi PHCC,4.13566,32.30088,Eastern Equatoria State,Magwi County,Magwi Payam,hospital,stay_dry,stay_dry,stay_dry
+Obbo PHCC,4.04457,32.42419,Eastern Equatoria State,Magwi County,Magwi Payam,hospital,stay_dry,stay_dry,stay_dry
+Omeo PHCU,4.20987,32.24769,Eastern Equatoria State,Magwi County,Magwi Payam,hospital,stay_dry,stay_dry,stay_dry
+OWINYKIBUL PHCU,3.84111,32.26569,Eastern Equatoria State,Magwi County,Magwi Payam,hospital,stay_dry,stay_dry,stay_dry
+Palotaka PHCU,4.02295,32.47198,Eastern Equatoria State,Magwi County,Magwi Payam,hospital,stay_dry,stay_dry,stay_dry
+Mugali PHCC,3.56646,32.19721,Eastern Equatoria State,Magwi County,Mugali Payam,hospital,stay_dry,stay_dry,stay_dry
+Nimule CDOT PHCC,3.58503,32.08616,Eastern Equatoria State,Magwi County,Nimule Payam,hospital,stay_dry,stay_dry,stay_dry
+Nimule Hospital,3.60029,32.05674,Eastern Equatoria State,Magwi County,Nimule Payam,hospital,stay_dry,stay_dry,stay_dry
+Opari PHCC,3.92338,32.06751,Eastern Equatoria State,Magwi County,Pageri Payam,hospital,stay_dry,stay_dry,stay_dry
+Pajok PHCC,3.859947,32.48367,Eastern Equatoria State,Magwi County,Pajok Payam,hospital,stay_dry,stay_dry,stay_dry
+Pogee PHCU,3.76672,32.5188,Eastern Equatoria State,Magwi County,Pajok Payam,hospital,stay_dry,stay_dry,stay_dry
+Bur Mutaram PHCU,4.52591,32.49406,Eastern Equatoria State,Torit County,Bur Payam,hospital,stay_dry,stay_dry,stay_dry
+Oronyo PHCC,4.57174,32.72784,Eastern Equatoria State,Torit County,Bur Payam,hospital,stay_dry,stay_dry,stay_dry
+Hilieu PHCC,4.32201,32.64614,Eastern Equatoria State,Torit County,Himodonge Payam,hospital,stay_dry,stay_dry,stay_dry
+Hiyala PHCC,4.46423,32.86489,Eastern Equatoria State,Torit County,Hiyala Payam,hospital,stay_dry,stay_dry,stay_dry
+Mura Hatiha PHCU,4.51026,32.78444,Eastern Equatoria State,Torit County,Hiyala Payam,hospital,stay_dry,stay_dry,stay_dry
+Oguruny PHCU,4.39587,32.90319,Eastern Equatoria State,Torit County,Hiyala Payam,hospital,stay_dry,stay_dry,stay_dry
+Imurok PHCU,4.31523,32.43245,Eastern Equatoria State,Torit County,Imurok Payam,hospital,stay_dry,stay_dry,stay_dry
+Kudo PHCC,4.54853,32.22776,Eastern Equatoria State,Torit County,Kudo Payam,hospital,stay_dry,stay_dry,stay_dry
+Lowoi PHCC,4.48993,32.16764,Eastern Equatoria State,Torit County,Kudo Payam,hospital,stay_dry,stay_dry,stay_dry
+Nyong PHCC,4.412822,32.570753,Eastern Equatoria State,Torit County,Nyong Payam,hospital,stay_dry,stay_dry,stay_dry
+Torit State Hospital,4.40629,32.57604,Eastern Equatoria State,Torit County,Nyong Payam,hospital,stay_dry,stay_dry,stay_dry
+Yidit PHCU,8.2176,32.26643,Jonglei State,Akobo County,Barmach Payam,hospital,stay_dry,stay_dry,stay_dry
+Akobo Hospital,7.79904,33.01015,Jonglei State,Akobo County,Bilkey Payam,hospital,stay_dry,stay_dry,stay_dry
+Nukta Thoklial PHCC,7.87776,32.99834,Jonglei State,Akobo County,Dengjok Payam,hospital,stay_dry,stay_dry,stay_dry
+Thokwath PHCU,7.94185,32.99663,Jonglei State,Akobo County,Dengjok Payam,hospital,stay_dry,stay_dry,stay_dry
+Diror PHCU,8.11623,32.33227,Jonglei State,Akobo County,Diror Payam,hospital,stay_dry,stay_dry,stay_dry
+Tangnyang PHCU,8.10797,32.29056,Jonglei State,Akobo County,Diror Payam,hospital,stay_dry,stay_dry,stay_dry
+Burmath PHCU,7.63963,33.16049,Jonglei State,Akobo County,Nyandit Payam,hospital,stay_dry,stay_dry,stay_dry
+Kaikuiny PHCC,8.09268,32.3857,Jonglei State,Akobo County,Walgak Payam,hospital,stay_dry,stay_dry,stay_dry
+Walgak PHCC,8.16075,32.23865,Jonglei State,Akobo County,Walgak Payam,hospital,stay_dry,stay_dry,stay_dry
+Ayod PHCC,8.12199,31.41376,Jonglei State,Ayod County,Ayod Payam,hospital,stay_dry,stay_dry,stay_dry
+Kuachdeng PHCU,8.422222,31.463889,Jonglei State,Ayod County,Kuach-deng Payam,hospital,stay_dry,stay_dry,stay_dry
+Haat PHCU,8.51648,30.63336,Jonglei State,Ayod County,Kurwai Payam,hospital,become_wet,stay_dry,stay_dry
+Mogok PHCC,8.40298,31.33491,Jonglei State,Ayod County,Mogok Payam,hospital,stay_dry,stay_dry,stay_dry
+Panyang PHCU,8.43226,31.34667,Jonglei State,Ayod County,Mogok Payam,hospital,stay_dry,stay_dry,stay_dry
+Manime PHCC,8.61122,30.71897,Jonglei State,Ayod County,Pagil Payam,hospital,stay_wet,stay_wet,stay_wet
+Normanyang PHCU,8.767561,31.054431,Jonglei State,Ayod County,Pagil Payam,hospital,become_wet,become_wet,stay_dry
+Pagil PHCC,8.70805,31.26611,Jonglei State,Ayod County,Pagil Payam,hospital,stay_dry,stay_dry,stay_dry
+Canal PHCC,8.1384,31.1919,Jonglei State,Ayod County,Pajiek Payam,hospital,stay_dry,stay_dry,stay_dry
+Keer PHCU,7.71488,30.64007,Jonglei State,Ayod County,Pajiek Payam,hospital,stay_wet,stay_wet,stay_wet
+Tuok PHCU,8.48997,30.681,Jonglei State,Ayod County,Pajiek Payam,hospital,stay_wet,stay_wet,stay_wet
+Paguong PHCC,8.1643,31.13908,Jonglei State,Ayod County,Wau Payam,hospital,stay_dry,stay_dry,stay_dry
+Wau PHCC,8.275,31.422222,Jonglei State,Ayod County,Wau Payam,hospital,stay_dry,stay_dry,stay_dry
+Wunkuel PHCU,8.26443,31.36264,Jonglei State,Ayod County,Wau Payam,hospital,stay_dry,stay_dry,stay_dry
+Anyidi PHCC,6.1938,31.56473,Jonglei State,Bor South County,Anyidi Payam,hospital,become_wet,stay_dry,stay_dry
+Mareng PHCU,6.202771,31.71387,Jonglei State,Bor South County,Anyidi Payam,hospital,stay_dry,stay_dry,stay_dry
+Makol-Cuei PHCU,6.378693,31.649276,Jonglei State,Bor South County,Baidit Payam,hospital,stay_dry,stay_dry,stay_dry
+Mathiang PHCU,6.49546,31.53532,Jonglei State,Bor South County,Baidit Payam,hospital,stay_dry,stay_dry,stay_dry
+Tong PHCU,6.40055,31.5687,Jonglei State,Bor South County,Baidit Payam,hospital,stay_dry,stay_dry,stay_dry
+Bor State Hospital,6.207802,31.555724,Jonglei State,Bor South County,Bor Payam,hospital,become_wet,stay_dry,stay_dry
+Malou PHCU,6.2288,31.55861,Jonglei State,Bor South County,Bor Payam,hospital,stay_dry,stay_dry,stay_dry
+Akuai Deng PHCU,6.56393,31.5301,Jonglei State,Bor South County,Jalle Payam,hospital,stay_dry,stay_dry,stay_dry
+Jalle PHCC,6.67189,31.48421,Jonglei State,Bor South County,Jalle Payam,hospital,stay_dry,stay_dry,stay_dry
+Kolmerak PHCU,6.61947,31.51721,Jonglei State,Bor South County,Jalle Payam,hospital,stay_dry,stay_dry,stay_dry
+Kolnyang PHCC,6.12538,31.58081,Jonglei State,Bor South County,Kolnyang Payam,hospital,stay_dry,stay_dry,stay_dry
+Malek PHCU,6.06775,31.6054,Jonglei State,Bor South County,Kolnyang Payam,hospital,become_wet,stay_dry,stay_dry
+Pariak PHCC,5.97125,31.66048,Jonglei State,Bor South County,Kolnyang Payam,hospital,become_wet,stay_dry,stay_dry
+Gakyuom PHCU,6.23524,31.57096,Jonglei State,Bor South County,Makuach Payam,hospital,stay_dry,stay_dry,stay_dry
+Lualdit PHCU,6.23641,31.61048,Jonglei State,Bor South County,Makuach Payam,hospital,stay_dry,stay_dry,stay_dry
+Palabach PHCU,6.2825,31.56683,Jonglei State,Bor South County,Makuach Payam,hospital,stay_dry,stay_dry,stay_dry
+Patuenoi PHCU,7.305775,31.285206,Jonglei State,Duk County,Ageer Payam,hospital,stay_wet,stay_wet,become_dry
+Poktap PHCC,7.45582,31.40912,Jonglei State,Duk County,Ageer Payam,hospital,stay_dry,stay_dry,stay_dry
+Amiel PHCU,7.6975,31.27888,Jonglei State,Duk County,Dongchak Payam,hospital,stay_dry,stay_dry,stay_dry
+Ayueldit PHCU,7.72416,31.33027,Jonglei State,Duk County,Padiet Payam,hospital,stay_dry,stay_dry,stay_dry
+Dorok PHCU,7.75805,31.29972,Jonglei State,Duk County,Padiet Payam,hospital,stay_dry,stay_dry,stay_dry
+Koyom Island PHCU,7.2628,30.473,Jonglei State,Duk County,Padiet Payam,hospital,stay_dry,stay_dry,stay_dry
+Pajut Kurgai PHCC,7.74741,31.68797,Jonglei State,Duk County,Panyang Payam,hospital,stay_dry,stay_dry,stay_dry
+Patuet PHCU,7.84904,31.6958,Jonglei State,Duk County,Panyang Payam,hospital,stay_dry,stay_dry,stay_dry
+Duk Lost Boy Hospital,7.48111,31.51638,Jonglei State,Duk County,Payuel Payam,hospital,stay_dry,stay_dry,stay_dry
+Juaibor PHCC,9.40132,30.67021,Jonglei State,Fangak County,Manajang Payam,hospital,stay_wet,stay_wet,stay_wet
+Kuemduok PHCU,9.21002,30.94483,Jonglei State,Fangak County,Manajang Payam,hospital,stay_wet,stay_wet,stay_wet
+Kuernyang PHCC,9.3198,30.88526,Jonglei State,Fangak County,Manajang Payam,hospital,become_wet,stay_dry,stay_dry
+Mandeng PHCU,9.38675,30.83775,Jonglei State,Fangak County,Manajang Payam,hospital,become_wet,become_wet,become_wet
+New Fangak Hospital,9.067823,30.881618,Jonglei State,Fangak County,Mareang Payam,hospital,stay_wet,stay_wet,become_dry
+Nyadin PHCC,8.79868,30.66779,Jonglei State,Fangak County,Mareang Payam,hospital,stay_wet,stay_wet,stay_wet
+Koat Nyakong PHCU,9.4386,31.05395,Jonglei State,Fangak County,Paguer Payam,hospital,stay_wet,stay_wet,stay_wet
+Kuerphon PHCU,9.616,30.6862,Jonglei State,Fangak County,Paguer Payam,hospital,stay_dry,stay_dry,stay_dry
+Paguir PHCU,9.10677,30.75883,Jonglei State,Fangak County,Paguer Payam,hospital,stay_wet,stay_wet,stay_wet
+Pulita PHCU,9.223262,30.660127,Jonglei State,Fangak County,Paguer Payam,hospital,become_wet,become_wet,become_wet
+Keew PHCC,9.26298,30.63498,Jonglei State,Fangak County,Phom Payam,hospital,become_wet,stay_dry,stay_dry
+Pakaan PHCC,9.38606,31.10943,Jonglei State,Fangak County,Phom Payam,hospital,stay_wet,stay_wet,stay_wet
+Chuil PHCC,8.57166,32.07666,Jonglei State,Nyirol County,Chuil Payam,hospital,stay_dry,stay_dry,stay_dry
+Riang PHCU,8.48886,31.833494,Jonglei State,Nyirol County,Nyambor Payam,hospital,stay_dry,stay_dry,stay_dry
+Pading PHCU,8.43333,31.8,Jonglei State,Nyirol County,Pading Payam,hospital,stay_dry,stay_dry,stay_dry
+Wenyal PHCU,7.99166,32.41666,Jonglei State,Nyirol County,Pading Payam,hospital,stay_dry,stay_dry,stay_dry
+Bariak PHCU,8.19783,32.150928,Jonglei State,Nyirol County,Thol Payam,hospital,stay_dry,stay_dry,stay_dry
+Pokbor PHCU,7.99166,32.52777,Jonglei State,Nyirol County,Thol Payam,hospital,stay_dry,stay_dry,stay_dry
+Pultruk PHCC,8.59466,31.94866,Jonglei State,Nyirol County,Thol Payam,hospital,stay_dry,stay_dry,stay_dry
+Tut Majok PHCU,7.85056,31.69666,Jonglei State,Nyirol County,Thol Payam,hospital,stay_dry,stay_dry,stay_dry
+Waat PHCC,8.19725,32.15,Jonglei State,Nyirol County,Waat Payam,hospital,stay_dry,stay_dry,stay_dry
+Diel PHCU,9.37418,31.30278,Jonglei State,Pigi County,Atar Payam,hospital,become_wet,become_wet,stay_dry
+Khorfulus PHCC,9.31476,31.57998,Jonglei State,Pigi County,Atar Payam,hospital,stay_wet,stay_wet,stay_wet
+Khorwac PHCC,7.621252,30.370747,Jonglei State,Pigi County,Khorwac Payam,hospital,stay_wet,stay_wet,stay_wet
+Kolanyang PHCU,9.33731,31.10725,Jonglei State,Pigi County,Khorwac Payam,hospital,stay_wet,stay_wet,stay_wet
+Patai PHCU,8.07223,31.83496,Jonglei State,Pigi County,Khorwac Payam,hospital,stay_dry,stay_dry,stay_dry
+Canal PHCC,9.215056,31.32586,Jonglei State,Pigi County,Mareng Payam,hospital,stay_dry,stay_dry,stay_dry
+Palieu PHCC,6.96001,31.37847,Jonglei State,Twic East County,Ajuong Payam,hospital,stay_dry,stay_dry,stay_dry
+Kongor PHCC,7.15625,31.35535,Jonglei State,Twic East County,Kongor Payam,hospital,become_wet,stay_dry,stay_dry
+Panyagor County Hospital,7.16644,31.40763,Jonglei State,Twic East County,Kongor Payam,hospital,stay_dry,stay_dry,stay_dry
+Khiir PHCU,7.34167,31.41139,Jonglei State,Twic East County,Lith Payam,hospital,stay_dry,stay_dry,stay_dry
+Wangulei PHCU,7.88824,31.37512,Jonglei State,Twic East County,Nyuak Payam,hospital,stay_dry,stay_dry,stay_dry
+Maar PHCC,6.88824,31.37514,Jonglei State,Twic East County,Pakeer Payam,hospital,stay_dry,stay_dry,stay_dry
+Patiou PHCC,6.77555,31.40806,Jonglei State,Twic East County,Pakeer Payam,hospital,stay_dry,stay_dry,stay_dry
+Pathai PHCU,7.926507,31.907487,Jonglei State,Uror County,Motot Payam,hospital,stay_dry,stay_dry,stay_dry
+Modit PHCU,7.98967,31.87836,Jonglei State,Uror County,Pathai Payam,hospital,stay_dry,stay_dry,stay_dry
+Payai PHCU,7.9854,31.95953,Jonglei State,Uror County,Pathai Payam,hospital,stay_dry,stay_dry,stay_dry
+Yuai PHCC,7.90507,31.89112,Jonglei State,Uror County,Payai Payam,hospital,stay_dry,stay_dry,stay_dry
+Pulchol PHCC,8.11236,31.96165,Jonglei State,Uror County,Puolchuol Payam,hospital,stay_dry,stay_dry,stay_dry
+Abuyung PHCU,6.35458,31.12789,Lakes State,Awerial County,Abuyung Payam,hospital,stay_dry,stay_dry,stay_dry
+Bunagok PHCC,6.21347,30.99541,Lakes State,Awerial County,Bunangok Payam,hospital,stay_dry,stay_dry,stay_dry
+Awerial PHCU,6.128161,31.170486,Lakes State,Awerial County,Dor Payam,hospital,stay_dry,stay_dry,stay_dry
+Dor PHCU,6.05065,31.28618,Lakes State,Awerial County,Dor Payam,hospital,stay_dry,stay_dry,stay_dry
+Kalthok PHCU,5.880311,31.520667,Lakes State,Awerial County,Puluk Payam,hospital,stay_dry,stay_dry,stay_dry
+Minkaman PHCC,6.056303,31.512286,Lakes State,Awerial County,Puluk Payam,hospital,become_wet,stay_dry,stay_dry
+Abiriu PHCC,6.93931,29.42391,Lakes State,Cueibet County,Abiriu Payam,hospital,stay_dry,stay_dry,stay_dry
+Chitchok PHCC,7.194868,29.222009,Lakes State,Cueibet County,Citcok Payam,hospital,stay_dry,stay_dry,stay_dry
+Duony PHCU,6.96816,29.37174,Lakes State,Cueibet County,Duony Payam,hospital,stay_dry,stay_dry,stay_dry
+Mayath PHCU,6.99032,29.32876,Lakes State,Cueibet County,Duony Payam,hospital,stay_dry,stay_dry,stay_dry
+Cueibet County Hospital,7.013111,29.241811,Lakes State,Cueibet County,Malou Pec Payam,hospital,stay_dry,stay_dry,stay_dry
+Langdit PHCU,7.059,29.09,Lakes State,Cueibet County,Malou Pec Payam,hospital,stay_dry,stay_dry,stay_dry
+Malou Pec PHCC,7.110418,29.029535,Lakes State,Cueibet County,Malou Pec Payam,hospital,stay_dry,stay_dry,stay_dry
+Mayen Thon PHCU,6.97154,29.22183,Lakes State,Cueibet County,Ngap Payam,hospital,stay_dry,stay_dry,stay_dry
+Pagor PHCU,7.209278,29.034544,Lakes State,Cueibet County,Pagor Payam,hospital,stay_dry,stay_dry,stay_dry
+Tiap Tiap PHCU,7.325156,29.324202,Lakes State,Cueibet County,Pagor Payam,hospital,stay_dry,stay_dry,stay_dry
+Amongpiny PHCC,7.035389,30.073722,Lakes State,Rumbek Centre County,Amongpiny Payam,hospital,stay_dry,stay_dry,stay_dry
+Akoljal PHCU,6.798819,29.827431,Lakes State,Rumbek Centre County,Jiir Payam,hospital,stay_dry,stay_dry,stay_dry
+Coloc-Cok PHCU,6.76047,29.54206,Lakes State,Rumbek Centre County,Matangai Payam,hospital,stay_dry,stay_dry,stay_dry
+Matangai PHCC,6.847714,29.616747,Lakes State,Rumbek Centre County,Matangai Payam,hospital,stay_dry,stay_dry,stay_dry
+Mathiangdhiei PHCU,6.777697,29.643856,Lakes State,Rumbek Centre County,Matangai Payam,hospital,stay_dry,stay_dry,stay_dry
+Nyang Koot PHCU,6.87041,29.67145,Lakes State,Rumbek Centre County,Matangai Payam,hospital,stay_dry,stay_dry,stay_dry
+Bal-Wau PHCU,6.741952,29.50321,Lakes State,Rumbek Centre County,Mayom Payam,hospital,stay_dry,stay_dry,stay_dry
+Bar-Chol PHCU,6.88428,29.54205,Lakes State,Rumbek Centre County,Mayom Payam,hospital,stay_dry,stay_dry,stay_dry
+Kiir Mayardit Woman Hospital,6.800639,29.671694,Lakes State,Rumbek Centre County,Rumbek Town Payam,hospital,stay_dry,stay_dry,stay_dry
+Malual Bab PHCC,6.80017,29.67544,Lakes State,Rumbek Centre County,Rumbek Town Payam,hospital,stay_dry,stay_dry,stay_dry
+Rumbek State Hospital,6.810214,29.678024,Lakes State,Rumbek Centre County,Rumbek Town Payam,hospital,stay_dry,stay_dry,stay_dry
+Aduel PHCC,6.629494,29.897931,Lakes State,Rumbek East County,Aduel Payam,hospital,stay_dry,stay_dry,stay_dry
+Dhiau-Kuei PHCU,6.560308,29.838606,Lakes State,Rumbek East County,Aduel Payam,hospital,stay_dry,stay_dry,stay_dry
+Mabor Duang PHCC,6.51803,29.83922,Lakes State,Rumbek East County,Aduel Payam,hospital,stay_dry,stay_dry,stay_dry
+Manai PHCU,6.491953,29.835431,Lakes State,Rumbek East County,Aduel Payam,hospital,stay_dry,stay_dry,stay_dry
+Akot PHCC,6.5536,30.037817,Lakes State,Rumbek East County,Akot Payam,hospital,stay_dry,stay_dry,stay_dry
+Atiaba PHCU,6.57394,29.96268,Lakes State,Rumbek East County,Atiaba Payam,hospital,stay_dry,stay_dry,stay_dry
+Maboric PHCU,6.50482,29.87485,Lakes State,Rumbek East County,Atiaba Payam,hospital,stay_dry,stay_dry,stay_dry
+Cueicok PHCC,6.72545,29.74546,Lakes State,Rumbek East County,Cueicok Payam,hospital,stay_dry,stay_dry,stay_dry
+Amer PHCU,6.631736,29.769672,Lakes State,Rumbek East County,Mathiang-kok Payam,hospital,stay_dry,stay_dry,stay_dry
+Malou PHCU,6.624911,29.744347,Lakes State,Rumbek East County,Mathiang-kok Payam,hospital,stay_dry,stay_dry,stay_dry
+Pacong PHCC,6.69274,29.78907,Lakes State,Rumbek East County,Pachong Payam,hospital,stay_dry,stay_dry,stay_dry
+Panawac PHCU,6.67585,29.81363,Lakes State,Rumbek East County,Pachong Payam,hospital,stay_dry,stay_dry,stay_dry
+Paloc PHCC,6.76723,30.10266,Lakes State,Rumbek East County,Paloch Payam,hospital,stay_dry,stay_dry,stay_dry
+Malueth PHCU,7.656811,29.648806,Lakes State,Rumbek North County,Malueeth Payam,hospital,stay_dry,stay_dry,stay_dry
+Maper Centre Hospital,7.64775,29.67,Lakes State,Rumbek North County,Maper Payam,hospital,stay_dry,stay_dry,stay_dry
+Amok PHCU,7.564997,29.6894,Lakes State,Rumbek North County,Mayen Payam,hospital,stay_dry,stay_dry,stay_dry
+Mayen PHCU,7.48755,29.663972,Lakes State,Rumbek North County,Mayen Payam,hospital,stay_dry,stay_dry,stay_dry
+Bahr Gel PHCU,6.720772,29.155027,Lakes State,Wulu County,Bargel Payam,hospital,stay_dry,stay_dry,stay_dry
+Makor PHCU,6.600477,29.309978,Lakes State,Wulu County,Bargel Payam,hospital,stay_dry,stay_dry,stay_dry
+Deteku PHCU,6.13464,29.47885,Lakes State,Wulu County,Domoloto Payam,hospital,stay_dry,stay_dry,stay_dry
+Wako PHCU,6.09382,29.76799,Lakes State,Wulu County,Domoloto Payam,hospital,stay_dry,stay_dry,stay_dry
+Laam PHCU,6.329761,29.91455,Lakes State,Wulu County,Makundi Payam,hospital,stay_dry,stay_dry,stay_dry
+Tonjo PHCU,6.332184,29.726893,Lakes State,Wulu County,Wulu Payam,hospital,stay_dry,stay_dry,stay_dry
+Wulu PHCC,6.508636,29.627166,Lakes State,Wulu County,Wulu Payam,hospital,stay_dry,stay_dry,stay_dry
+Adior PHCC,6.78063,30.72161,Lakes State,Yirol East County,Adior Payam,hospital,stay_dry,stay_dry,stay_dry
+Acigor PHCU,6.71116,30.49647,Lakes State,Yirol East County,Lekakedu Payam,hospital,stay_dry,stay_dry,stay_dry
+Lekakedu PHCU,6.67716,30.58644,Lakes State,Yirol East County,Lekakedu Payam,hospital,stay_dry,stay_dry,stay_dry
+Malek PHCC,6.7211,30.79634,Lakes State,Yirol East County,Malek Payam (Yirol E),hospital,stay_dry,stay_dry,stay_dry
+Nyang PHCC,6.70794,30.60554,Lakes State,Yirol East County,Pagarau Payam,hospital,stay_dry,stay_dry,stay_dry
+Pagarau PHCC,6.74065,30.40829,Lakes State,Yirol East County,Pagarau Payam,hospital,become_wet,stay_dry,stay_dry
+KAP PHCU,6.71586,30.44643,Lakes State,Yirol East County,Yali Payam,hospital,stay_dry,stay_dry,stay_dry
+Thonabutkok PHCU,6.67889,30.4159,Lakes State,Yirol East County,Yali Payam,hospital,stay_dry,stay_dry,stay_dry
+Aruau PHCU,6.65581,30.62861,Lakes State,Yirol West County,Abang Payam,hospital,stay_dry,stay_dry,stay_dry
+Betoi PHCU,6.63783,30.68849,Lakes State,Yirol West County,Abang Payam,hospital,stay_dry,stay_dry,stay_dry
+Pankar PHCU,6.57765,30.47834,Lakes State,Yirol West County,Abang Payam,hospital,stay_dry,stay_dry,stay_dry
+Yirol County Hospital,6.55331,30.50172,Lakes State,Yirol West County,Abang Payam,hospital,stay_dry,stay_dry,stay_dry
+Agany PHCU,6.43659,30.05486,Lakes State,Yirol West County,Aluakluak Payam,hospital,stay_dry,stay_dry,stay_dry
+Aluak Luak PHCC,6.4682,30.1051,Lakes State,Yirol West County,Aluakluak Payam,hospital,stay_dry,stay_dry,stay_dry
+Anuol PHCC,6.25813,30.38268,Lakes State,Yirol West County,Anuol Payam,hospital,stay_dry,stay_dry,stay_dry
+Mangang PHCU,6.32161,30.32244,Lakes State,Yirol West County,Anuol Payam,hospital,stay_dry,stay_dry,stay_dry
+Pabur PHCU,6.43261,30.59899,Lakes State,Yirol West County,Geng-geng Payam,hospital,stay_dry,stay_dry,stay_dry
+Pandit PHCU,6.59416,30.15039,Lakes State,Yirol West County,Gher Payam,hospital,stay_dry,stay_dry,stay_dry
+Wouwou PHCU,6.54987,30.4963,Lakes State,Yirol West County,Mapuordit Payam,hospital,stay_dry,stay_dry,stay_dry
+Aroyo DTC PHCC,8.40332,26.51259,Northern Bahr El Ghazal State,Aweil Centre County,Aroyo Payam,hospital,stay_dry,stay_dry,stay_dry
+Awada PHCC,8.06861,26.8391,Northern Bahr El Ghazal State,Aweil Centre County,Awada Payam,hospital,stay_dry,stay_dry,stay_dry
+Aweil Civil Hospital,8.768444,27.398381,Northern Bahr El Ghazal State,Aweil Centre County,Aweil Town Payam,hospital,stay_dry,stay_dry,stay_dry
+Bar Mayen PHCC,8.21494,27.36456,Northern Bahr El Ghazal State,Aweil Centre County,Bar Mayen Payam,hospital,stay_dry,stay_dry,stay_dry
+Mabok Akot PHCU,8.894972,26.894972,Northern Bahr El Ghazal State,Aweil Centre County,Chel South Payam,hospital,stay_dry,stay_dry,stay_dry
+Gabat PHCC,8.759489,27.385069,Northern Bahr El Ghazal State,Aweil Centre County,Nyalath Payam,hospital,stay_dry,stay_dry,stay_dry
+Peth PHCU,8.96447,27.79725,Northern Bahr El Ghazal State,Aweil East County,Akon North Payam (Aweil E),hospital,stay_dry,stay_dry,stay_dry
+Bakou PHCU,9.43741,27.71681,Northern Bahr El Ghazal State,Aweil East County,Baach Payam,hospital,stay_dry,stay_dry,stay_dry
+Goldhim TB Hospital,9.23205,27.66689,Northern Bahr El Ghazal State,Aweil East County,Baach Payam,hospital,stay_dry,stay_dry,stay_dry
+Malualkon County Hospital,9.01359,27.624809,Northern Bahr El Ghazal State,Aweil East County,Baach Payam,hospital,stay_dry,stay_dry,stay_dry
+Omdurman PHCC,9.23435,27.51199,Northern Bahr El Ghazal State,Aweil East County,Baach Payam,hospital,stay_dry,stay_dry,stay_dry
+Rumaker PHCU,9.15,27.59,Northern Bahr El Ghazal State,Aweil East County,Baach Payam,hospital,stay_dry,stay_dry,stay_dry
+Warawar PHCU,9.01681,27.62678,Northern Bahr El Ghazal State,Aweil East County,Baach Payam,hospital,stay_dry,stay_dry,stay_dry
+Mabok Tong PHCU,9.47968,27.771067,Northern Bahr El Ghazal State,Aweil East County,Madhol Payam,hospital,stay_dry,stay_dry,stay_dry
+Madhol PHCU,9.03872,27.70298,Northern Bahr El Ghazal State,Aweil East County,Madhol Payam,hospital,stay_dry,stay_dry,stay_dry
+Amethgolduang PHCU,9.08558,27.89715,Northern Bahr El Ghazal State,Aweil East County,Malual Bai Payam,hospital,stay_dry,stay_dry,stay_dry
+Lieth PHCC,9.24728,27.78361,Northern Bahr El Ghazal State,Aweil East County,Malual Bai Payam,hospital,stay_dry,stay_dry,stay_dry
+Majok Yith Thiou PHCU,9.514741,27.246706,Northern Bahr El Ghazal State,Aweil East County,Malual Bai Payam,hospital,stay_dry,stay_dry,stay_dry
+Malual Baai PHCC,9.05925,27.75988,Northern Bahr El Ghazal State,Aweil East County,Malual Bai Payam,hospital,stay_dry,stay_dry,stay_dry
+Mangar Tong PHCU,9.07419,27.54858,Northern Bahr El Ghazal State,Aweil East County,Mangar Tong Payam,hospital,stay_dry,stay_dry,stay_dry
+Rumwet Kor PHCU,9.2814,27.58534,Northern Bahr El Ghazal State,Aweil East County,Mangar Tong Payam,hospital,stay_dry,stay_dry,stay_dry
+Tit Chok PHCC,8.85862,27.53977,Northern Bahr El Ghazal State,Aweil East County,Mangar Tong Payam,hospital,stay_dry,stay_dry,stay_dry
+Wonyjok PHCC,9.230833,27.732,Northern Bahr El Ghazal State,Aweil East County,Mangar Tong Payam,hospital,stay_dry,stay_dry,stay_dry
+Mangok PHCU,9.04256,27.38596,Northern Bahr El Ghazal State,Aweil East County,Mangok Payam,hospital,stay_dry,stay_dry,stay_dry
+Malual-Kuel PHCU,9.42845,27.30181,Northern Bahr El Ghazal State,Aweil East County,Wunlang Payam,hospital,stay_dry,stay_dry,stay_dry
+Wunlang PHCU,9.03585,27.51276,Northern Bahr El Ghazal State,Aweil East County,Wunlang Payam,hospital,stay_dry,stay_dry,stay_dry
+Akuem PHCC,8.9621,27.50069,Northern Bahr El Ghazal State,Aweil East County,Yargot Payam,hospital,stay_dry,stay_dry,stay_dry
+Warlang PHCU,9.03585,27.51276,Northern Bahr El Ghazal State,Aweil East County,Yargot Payam,hospital,stay_dry,stay_dry,stay_dry
+Yargot PHCU,9.00813,27.45918,Northern Bahr El Ghazal State,Aweil East County,Yargot Payam,hospital,stay_dry,stay_dry,stay_dry
+Arieth PHCU,9.105,27.2224,Northern Bahr El Ghazal State,Aweil North County,Ariath Payam,hospital,stay_dry,stay_dry,stay_dry
+Kajik PHCU,9.16686,27.1368,Northern Bahr El Ghazal State,Aweil North County,Ariath Payam,hospital,stay_dry,stay_dry,stay_dry
+Ajak Wol PHCU,9.19451,27.06147,Northern Bahr El Ghazal State,Aweil North County,Malual Centre Payam,hospital,stay_dry,stay_dry,stay_dry
+Majak Kar PHCC,9.223714,27.021672,Northern Bahr El Ghazal State,Aweil North County,Malual Centre Payam,hospital,stay_dry,stay_dry,stay_dry
+Marol Deng Geng PHCU,9.24667,27.0631,Northern Bahr El Ghazal State,Aweil North County,Malual Centre Payam,hospital,stay_dry,stay_dry,stay_dry
+Abyei Chok PHCU,9.13579,27.25814,Northern Bahr El Ghazal State,Aweil North County,Malual East Payam,hospital,stay_dry,stay_dry,stay_dry
+Jaac PPF PHCU,9.47461,27.1361,Northern Bahr El Ghazal State,Aweil North County,Malual East Payam,hospital,stay_dry,stay_dry,stay_dry
+Malual Deng Aruom PHCU,9.21159,27.11443,Northern Bahr El Ghazal State,Aweil North County,Malual East Payam,hospital,stay_dry,stay_dry,stay_dry
+Mayen Ulem PHCC,9.03714,27.2854,Northern Bahr El Ghazal State,Aweil North County,Malual East Payam,hospital,stay_dry,stay_dry,stay_dry
+Warapei PHCC,9.24262,27.08467,Northern Bahr El Ghazal State,Aweil North County,Malual East Payam,hospital,stay_dry,stay_dry,stay_dry
+Wargeng PHCU,9.022247,27.365244,Northern Bahr El Ghazal State,Aweil North County,Malual East Payam,hospital,stay_dry,stay_dry,stay_dry
+Gok Machar PHCC,9.12562,26.51585,Northern Bahr El Ghazal State,Aweil North County,Malual North Payam,hospital,stay_dry,stay_dry,stay_dry
+Mayom Adhal PHCU,9.11563,26.57282,Northern Bahr El Ghazal State,Aweil North County,Malual North Payam,hospital,stay_dry,stay_dry,stay_dry
+Majak Bai PHCC,9.118758,26.79562,Northern Bahr El Ghazal State,Aweil North County,Malual West Payam (Aweil N),hospital,stay_dry,stay_dry,stay_dry
+Warchuei PHCU,9.10336,26.44253,Northern Bahr El Ghazal State,Aweil North County,Malual West Payam (Aweil N),hospital,stay_dry,stay_dry,stay_dry
+Ayai PHCU,8.521526,27.56689,Northern Bahr El Ghazal State,Aweil South County,Ayai Payam,hospital,stay_dry,stay_dry,stay_dry
+Akac PHCC,8.573083,27.727028,Northern Bahr El Ghazal State,Aweil South County,Gakrol Payam,hospital,stay_dry,stay_dry,stay_dry
+Wuncum PHCU,8.66158,27.67716,Northern Bahr El Ghazal State,Aweil South County,Gakrol Payam,hospital,stay_dry,stay_dry,stay_dry
+Nyieth PHCU,8.496383,27.543607,Northern Bahr El Ghazal State,Aweil South County,Nyieth Payam,hospital,stay_dry,stay_dry,stay_dry
+Malek Alel PHCC,8.58882,27.59433,Northern Bahr El Ghazal State,Aweil South County,Nyocawany I Payam,hospital,stay_dry,stay_dry,stay_dry
+Panthou DTC PHCC,8.58908,27.5945,Northern Bahr El Ghazal State,Aweil South County,Panthou Payam,hospital,stay_dry,stay_dry,stay_dry
+Makuei Alel PHCU,8.708306,27.74975,Northern Bahr El Ghazal State,Aweil South County,Tar-Weng Payam,hospital,stay_dry,stay_dry,stay_dry
+Tiar - Aleit PHCC,8.46566,27.53356,Northern Bahr El Ghazal State,Aweil South County,Tiar-aleit Payam,hospital,stay_dry,stay_dry,stay_dry
+Wathmouk PHCU,8.69693,27.6813,Northern Bahr El Ghazal State,Aweil South County,Wathmuok Payam,hospital,stay_dry,stay_dry,stay_dry
+Nyamlel PHCC,9.13852,26.98248,Northern Bahr El Ghazal State,Aweil West County,Gomjuer Center Payam,hospital,stay_dry,stay_dry,stay_dry
+Aguat PHCU,9.07424,27.09102,Northern Bahr El Ghazal State,Aweil West County,Mariem East Payam,hospital,stay_dry,stay_dry,stay_dry
+Amatnyang PHCU,9.074361,27.144556,Northern Bahr El Ghazal State,Aweil West County,Mariem East Payam,hospital,stay_dry,stay_dry,stay_dry
+Anyuopjang PHCU,9.131611,26.980301,Northern Bahr El Ghazal State,Aweil West County,Mariem East Payam,hospital,stay_dry,stay_dry,stay_dry
+Chelcou PHCC,8.96631,26.8607,Northern Bahr El Ghazal State,Aweil West County,Mariem East Payam,hospital,stay_dry,stay_dry,stay_dry
+Guangnou PHCU,8.92295,26.91515,Northern Bahr El Ghazal State,Aweil West County,Mariem East Payam,hospital,stay_dry,stay_dry,stay_dry
+Majook Dengdit PHCU,9.102761,27.061207,Northern Bahr El Ghazal State,Aweil West County,Mariem East Payam,hospital,stay_dry,stay_dry,stay_dry
+Marial Bai DTC PHCC,9.10256,26.85088,Northern Bahr El Ghazal State,Aweil West County,Mariem East Payam,hospital,stay_dry,stay_dry,stay_dry
+Mayom Akuang Rel PHCC,9.0541,26.424009,Northern Bahr El Ghazal State,Aweil West County,Mariem East Payam,hospital,stay_dry,stay_dry,stay_dry
+Nyinbouli PHCC,9.02163,26.507,Northern Bahr El Ghazal State,Aweil West County,Mariem East Payam,hospital,stay_dry,stay_dry,stay_dry
+Wedweil PHCC,9.00736,27.19788,Northern Bahr El Ghazal State,Aweil West County,Mariem East Payam,hospital,stay_dry,stay_dry,stay_dry
+Wungiir PHCU,9.11982,26.75597,Northern Bahr El Ghazal State,Aweil West County,Mariem East Payam,hospital,stay_dry,stay_dry,stay_dry
+Maker PHCU,8.91356,27.333,Northern Bahr El Ghazal State,Aweil West County,Mariem West Payam,hospital,stay_dry,stay_dry,stay_dry
+Udhum DTC PHCC,8.88615,27.25303,Northern Bahr El Ghazal State,Aweil West County,Mariem West Payam,hospital,stay_dry,stay_dry,stay_dry
+Boma Hospital,6.17872,34.38825,Pibor Administrative Area,Pibor County,Boma Payam,hospital,stay_dry,stay_dry,stay_dry
+Khoradep PHCU,6.15083,34.39389,Pibor Administrative Area,Pibor County,Kiziongora Payam,hospital,stay_dry,stay_dry,stay_dry
+Labarab PHCU,6.66112,33.9697,Pibor Administrative Area,Pibor County,Miwono Payam,hospital,stay_dry,stay_dry,stay_dry
+Meiwun PHCU,6.249778,34.679135,Pibor Administrative Area,Pibor County,Boma Payam,hospital,stay_dry,stay_dry,stay_dry
+Pibor Hospital,6.795607,33.135455,Pibor Administrative Area,Pibor County,Pibor Payam,hospital,stay_dry,stay_dry,stay_dry
+Vertheth PHCU,6.678737,33.206712,Pibor Administrative Area,Pibor County,Vertheth Payam,hospital,stay_dry,stay_dry,stay_dry
+Ajwara PHCU,7.13913,33.96708,Pibor Administrative Area,Pochalla County,Adongo Payam,hospital,stay_dry,stay_dry,stay_dry
+Nyium PHCU,7.03561,34.00355,Pibor Administrative Area,Pochalla County,Adongo Payam,hospital,stay_dry,stay_dry,stay_dry
+Otallo PHCU,7.150013,33.861787,Pibor Administrative Area,Pochalla County,Adongo Payam,hospital,stay_dry,stay_dry,stay_dry
+Okadi PHCU,6.09858,34.01997,Pibor Administrative Area,Pochalla County,Akiela Payam,hospital,stay_dry,stay_dry,stay_dry
+Obuodi PHCU,7.08008,34.01674,Pibor Administrative Area,Pochalla County,Pochalla Payam,hospital,stay_dry,stay_dry,stay_dry
+Ojangbai PHCU,7.15463,34.13464,Pibor Administrative Area,Pochalla County,Pochalla Payam,hospital,stay_dry,stay_dry,stay_dry
+Pochalla Hospital,7.17761,34.08731,Pibor Administrative Area,Pochalla County,Pochalla Payam,hospital,stay_dry,stay_dry,stay_dry
+Abiemnom PHCC,9.39874,28.8234,Ruweng Administrative Area,Abiemnhom County,Abiemnom Payam,hospital,stay_dry,stay_dry,stay_dry
+Awarpiny PHCU,9.47362,28.88828,Ruweng Administrative Area,Abiemnhom County,Abiemnom Payam,hospital,stay_dry,stay_dry,stay_dry
+Manajoga PHCU,9.392128,28.811239,Ruweng Administrative Area,Abiemnhom County,Abiemnom Payam,hospital,stay_dry,stay_dry,stay_dry
+Panyang PHCU,9.40919,28.91259,Ruweng Administrative Area,Abiemnhom County,Abiemnom Payam,hospital,stay_dry,stay_dry,stay_dry
+Bongki PHCU,10.015,29.7906,Ruweng Administrative Area,Pariang County,Aliiny Payam,hospital,stay_dry,stay_dry,stay_dry
+Biu PHCC,9.64571,30.29749,Ruweng Administrative Area,Pariang County,Biu Payam,hospital,stay_dry,stay_dry,stay_dry
+Ajoungthok PHCU,9.09,30.03,Ruweng Administrative Area,Pariang County,Jamjang Payam,hospital,stay_dry,stay_dry,stay_dry
+Gumriak PHCU,10.027539,30.19725,Ruweng Administrative Area,Pariang County,Jamjang Payam,hospital,stay_dry,stay_dry,stay_dry
+Hakima Yacoub PHCC,10.1,30.09,Ruweng Administrative Area,Pariang County,Jamjang Payam,hospital,stay_dry,stay_dry,stay_dry
+Jamjang PHCC,9.92793,30.29113,Ruweng Administrative Area,Pariang County,Jamjang Payam,hospital,stay_dry,stay_dry,stay_dry
+Pamiir PHCC,9.91,30.35,Ruweng Administrative Area,Pariang County,Jamjang Payam,hospital,stay_dry,stay_dry,stay_dry
+Kong PHCU,9.836122,30.027536,Ruweng Administrative Area,Pariang County,Nyiel Payam,hospital,stay_dry,stay_dry,stay_dry
+Panyang PHCC,10.04222,29.92587,Ruweng Administrative Area,Pariang County,Pariang Payam,hospital,stay_dry,stay_dry,stay_dry
+Pariang Hospital,9.91134,29.98214,Ruweng Administrative Area,Pariang County,Pariang Payam,hospital,stay_dry,stay_dry,stay_dry
+Yida Centre A PHCC,10.11,30.09,Ruweng Administrative Area,Pariang County,Werthen Payam,hospital,stay_dry,stay_dry,stay_dry
+Guit PHCC,9.15831,29.9106,Unity State,Guit County,Guit Payam,hospital,stay_wet,become_dry,become_dry
+Kedat PHCU,9.031339,30.061294,Unity State,Guit County,Kadet Payam,hospital,stay_dry,stay_dry,stay_dry
+Kuach PHCC,8.90207,30.02947,Unity State,Guit County,Kuach Payam,hospital,stay_dry,stay_dry,stay_dry
+Kuerguini PHCU,9.26068,29.89102,Unity State,Guit County,Kuerguini Payam,hospital,stay_wet,stay_wet,stay_wet
+Niemni PHCC,9.306375,30.026222,Unity State,Guit County,Niemni Payam,hospital,stay_wet,stay_wet,stay_wet
+Boaw PHCC,8.84379,29.7296,Unity State,Koch County,Boaw Payam,hospital,stay_wet,stay_wet,stay_wet
+Rier PHCU,8.78296,30.10023,Unity State,Koch County,Jaak Payam,hospital,stay_dry,stay_dry,stay_dry
+Koch Hospital,8.59984,29.98989,Unity State,Koch County,Kochlual Payam,hospital,stay_dry,stay_dry,stay_dry
+Mirmir PHCC,8.4646,30.10225,Unity State,Koch County,Ngony Payam,hospital,stay_dry,stay_dry,stay_dry
+Bou PHCU,8.191579,29.962408,Unity State,Leer County,Bou Payam,hospital,stay_dry,stay_dry,stay_dry
+Juong PHCU,8.301142,30.146642,Unity State,Leer County,Dok Payam,hospital,stay_dry,stay_dry,stay_dry
+Guat PHCU,8.38339,30.1446,Unity State,Leer County,Guat Payam,hospital,stay_dry,stay_dry,stay_dry
+Leer County Hospital,8.33339,30.1986,Unity State,Leer County,Guat Payam,hospital,stay_dry,stay_dry,stay_dry
+Dindin PHCU,8.30592,30.23189,Unity State,Leer County,Padeah Payam,hospital,stay_dry,stay_dry,stay_dry
+Gandor PHCU,8.31082,30.24179,Unity State,Leer County,Padeah Payam,hospital,stay_dry,stay_dry,stay_dry
+Lual PHCU,8.24083,30.07446,Unity State,Leer County,Padeah Payam,hospital,become_wet,stay_dry,stay_dry
+Pilieny PHCU,8.17666,30.22635,Unity State,Leer County,Pilieny Payam,hospital,stay_dry,stay_dry,stay_dry
+Thonyor PHCC,8.22265,30.21959,Unity State,Leer County,Yang Payam,hospital,stay_dry,stay_dry,stay_dry
+Mayendit County Hospital,8.13179,30.01659,Unity State,Mayendit County,Bhor Payam,hospital,stay_wet,stay_wet,stay_wet
+Leah PHCU,8.263189,30.115375,Unity State,Mayendit County,Luom Payam,hospital,stay_dry,stay_dry,stay_dry
+Malkuer PHCU,8.16322,29.94298,Unity State,Mayendit County,Maal Payam,hospital,stay_wet,stay_wet,stay_wet
+Madol PHCU,7.90338,29.84211,Unity State,Mayendit County,Pabuong Payam,hospital,stay_dry,stay_dry,stay_dry
+Pabuong PHCU,8.12388,30.0058,Unity State,Mayendit County,Pabuong Payam,hospital,stay_wet,stay_wet,stay_wet
+Rubkuay PHCC,8.39178,30.07858,Unity State,Mayendit County,Rubkuay Payam,hospital,stay_dry,stay_dry,stay_dry
+Kuok PHCU,8.39445,30.05323,Unity State,Mayendit County,Thaker Payam,hospital,stay_dry,stay_dry,stay_dry
+Thakker PHCU,8.39314,30.04937,Unity State,Mayendit County,Thaker Payam,hospital,stay_dry,stay_dry,stay_dry
+Jaguar PHCU,8.35909,30.02363,Unity State,Mayendit County,Tharjiath Payam,hospital,stay_wet,stay_wet,stay_wet
+Luom PHCU,8.3978,30.12956,Unity State,Mayendit County,Tutnyang Payam,hospital,stay_dry,stay_dry,stay_dry
+Tutnyang PHCU,8.35971,30.10045,Unity State,Mayendit County,Tutnyang Payam,hospital,stay_dry,stay_dry,stay_dry
+Bieh PHCU,9.10203,28.79719,Unity State,Mayom County,Bieh Payam,hospital,stay_dry,stay_dry,stay_dry
+Mayom Hospital,9.22217,29.17567,Unity State,Mayom County,Kuerbone Payam,hospital,stay_dry,stay_dry,stay_dry
+Kueryiek PHCU,9.042227,28.847746,Unity State,Mayom County,Kueryiek Payam,hospital,stay_dry,stay_dry,stay_dry
+Mankien PHCC,9.05212,29.09001,Unity State,Mayom County,Mankien Payam,hospital,stay_dry,stay_dry,stay_dry
+Ngop PHCU,9.12261,28.95135,Unity State,Mayom County,Ngop Payam,hospital,stay_dry,stay_dry,stay_dry
+Pub PHCU,9.013087,29.0012,Unity State,Mayom County,Pub Payam,hospital,stay_dry,stay_dry,stay_dry
+Riah PHCU,8.91313,29.27647,Unity State,Mayom County,Riah Payam,hospital,stay_dry,stay_dry,stay_dry
+Wangkei PHCC,9.08799,29.45546,Unity State,Mayom County,Wangkei Payam,hospital,stay_dry,stay_dry,stay_dry
+Dekom PHCU,7.35899,30.45656,Unity State,Panyijar County,Ganyliel Payam,hospital,stay_dry,stay_dry,stay_dry
+Ganyiel PHCC,7.40497,30.47237,Unity State,Panyijar County,Ganyliel Payam,hospital,stay_dry,stay_dry,stay_dry
+Kol PHCU,7.5982,30.25591,Unity State,Panyijar County,Kol Payam,hospital,stay_wet,stay_wet,become_dry
+Maluok PHCU,7.51715,30.26757,Unity State,Panyijar County,Kol Payam,hospital,stay_dry,stay_dry,stay_dry
+Pathiel PHCU,7.655025,30.247661,Unity State,Panyijar County,Kol Payam,hospital,stay_wet,stay_wet,stay_wet
+Maluak PHCU,7.74545,30.15109,Unity State,Panyijar County,Mayom Payam (Mayom),hospital,stay_wet,stay_wet,stay_wet
+Janglou PHCU,7.68726,30.23419,Unity State,Panyijar County,Nyal Payam,hospital,stay_wet,stay_wet,stay_wet
+Nyal PHCC,7.72375,30.24858,Unity State,Panyijar County,Nyal Payam,hospital,become_wet,stay_dry,stay_dry
+Pachar PHCU,7.31786,30.42074,Unity State,Panyijar County,Pachaar Payam,hospital,stay_dry,stay_dry,stay_dry
+Morgok PHCU,7.26168,30.33351,Unity State,Panyijar County,Pachak Payam,hospital,stay_dry,stay_dry,stay_dry
+Pachak PHCU,7.29292,30.44636,Unity State,Panyijar County,Pachak Payam,hospital,stay_dry,stay_dry,stay_dry
+Pacienjok PHCU,7.31342,30.4627,Unity State,Panyijar County,Pachienjok Payam,hospital,stay_dry,stay_dry,stay_dry
+Buotbai PHCU,7.416111,30.465833,Unity State,Panyijar County,Thoarnhoum Payam,hospital,stay_dry,stay_dry,stay_dry
+Chuk County Hospital,7.45221,30.28127,Unity State,Panyijar County,Tiap Payam,hospital,stay_dry,stay_dry,stay_dry
+Laidit PHCU,7.45766,30.40111,Unity State,Panyijar County,Tiap Payam,hospital,stay_dry,stay_dry,stay_dry
+Tiap PHCU,7.41478,30.42403,Unity State,Panyijar County,Tiap Payam,hospital,stay_dry,stay_dry,stay_dry
+Bentiu State Hospital,9.2535,29.80299,Unity State,Rubkona County,Bentiu Town Payam,hospital,stay_dry,stay_dry,stay_dry
+Kaljak PHCC,9.27611,29.53649,Unity State,Rubkona County,Kaljak Payam,hospital,stay_dry,stay_dry,stay_dry
+Rubkona Care PHCC,9.29023,29.78955,Unity State,Rubkona County,Rubkotne Payam,hospital,stay_dry,stay_dry,stay_dry
+Bienythiang PHCU,9.83291,32.03771,Upper Nile State,Akoka County,Akoka Payam,hospital,become_wet,become_wet,stay_dry
+Bai-chan PHCU,9.55204,32.10451,Upper Nile State,Akoka County,Akudueng Payam,hospital,stay_dry,stay_dry,stay_dry
+Rom PHCU,9.882,32.15379,Upper Nile State,Akoka County,Bienythiang payam,hospital,become_wet,stay_dry,stay_dry
+Riang PHCU,8.48886,31.833494,Upper Nile State,Akoka County,Rom Payam,hospital,stay_dry,stay_dry,stay_dry
+Wunbut PHCU,9.15684,32.20829,Upper Nile State,Baliet County,Abwong Payam,hospital,stay_dry,stay_dry,stay_dry
+Adong PHCC,9.24329,32.15636,Upper Nile State,Baliet County,Adong Payam,hospital,stay_dry,stay_dry,stay_dry
+Gellachol PHCU,9.100863,32.369193,Upper Nile State,Baliet County,Gel Achiel Payam,hospital,stay_dry,stay_dry,stay_dry
+Baliet PHCC,9.296,32.0578,Upper Nile State,Baliet County,Nyongkuach Payam,hospital,stay_dry,stay_dry,stay_dry
+Riangnum PHCU,9.33028,32.02087,Upper Nile State,Baliet County,Nyongrial Payam,hospital,stay_dry,stay_dry,stay_dry
+Aburoc PHCU,10.104314,32.08361,Upper Nile State,Fashoda County,Dethok Payam,hospital,stay_dry,stay_dry,stay_dry
+Detwok PHCU,10.00799,32.18204,Upper Nile State,Fashoda County,Dethok Payam,hospital,become_wet,stay_dry,stay_dry
+Mallo PHCU,10.04908,32.2088,Upper Nile State,Fashoda County,Dethok Payam,hospital,become_wet,stay_dry,stay_dry
+Gollo PHCU,9.9601,32.15322,Upper Nile State,Fashoda County,Kodok Payam,hospital,stay_wet,stay_wet,become_dry
+Otego PHCU,9.894,31.99256,Upper Nile State,Fashoda County,Kodok Payam,hospital,stay_dry,stay_dry,stay_dry
+Bol PHCU,9.7276,31.85959,Upper Nile State,Fashoda County,Lul Payam,hospital,become_wet,stay_dry,stay_dry
+Lul West PHCU,9.758934,31.942028,Upper Nile State,Fashoda County,Lul Payam,hospital,become_wet,become_wet,stay_dry
+Orinyi PHCC,9.86776,31.8901,Upper Nile State,Fashoda County,Lul Payam,hospital,stay_dry,stay_dry,stay_dry
+Dajok PHCC,9.20519,33.95814,Upper Nile State,Longochuk County,Dajo Payam,hospital,stay_dry,stay_dry,stay_dry
+Wichlita PHCU,9.25434,33.8427,Upper Nile State,Longochuk County,Dajo Payam,hospital,stay_dry,stay_dry,stay_dry
+Chot Lual PHCU,9.119932,33.585745,Upper Nile State,Longochuk County,Guelguk Payam,hospital,stay_dry,stay_dry,stay_dry
+Chutbora PHCC,9.20612,33.75307,Upper Nile State,Longochuk County,Guelguk Payam,hospital,stay_dry,stay_dry,stay_dry
+Guelguk PHCC,9.7556,32.97987,Upper Nile State,Longochuk County,Guelguk Payam,hospital,stay_dry,stay_dry,stay_dry
+Jongok PHCU,9.054721,33.427595,Upper Nile State,Longochuk County,Longochuk Payam,hospital,stay_dry,stay_dry,stay_dry
+Mathiang Hospital,9.022864,33.503413,Upper Nile State,Longochuk County,Longochuk Payam,hospital,stay_dry,stay_dry,stay_dry
+Warweng PHCU,9.019381,33.469617,Upper Nile State,Longochuk County,Longochuk Payam,hospital,stay_dry,stay_dry,stay_dry
+Majiok PHCU,8.942072,33.506261,Upper Nile State,Longochuk County,Malual Payam,hospital,stay_dry,stay_dry,stay_dry
+Malow PHCU,9.006044,33.570687,Upper Nile State,Longochuk County,Malual Payam,hospital,stay_dry,stay_dry,stay_dry
+Malual PHCU,8.935452,33.57139,Upper Nile State,Longochuk County,Malual Payam,hospital,stay_dry,stay_dry,stay_dry
+Watber PHCC,8.935504,33.57146,Upper Nile State,Longochuk County,Malual Payam,hospital,stay_dry,stay_dry,stay_dry
+Belwang PHCU,6.207802,31.555724,Upper Nile State,Longochuk County,Pamach Payam,hospital,become_wet,stay_dry,stay_dry
+Pamac PHCU,8.877807,33.606631,Upper Nile State,Longochuk County,Pamach Payam,hospital,stay_dry,stay_dry,stay_dry
+Wudier PHCC,9.31143,33.684745,Upper Nile State,Longochuk County,Wudier Payam,hospital,stay_dry,stay_dry,stay_dry
+Dingkar PHCU,8.45154,33.015191,Upper Nile State,Luakpiny/Nasir County,Dingkar Payam,hospital,stay_wet,stay_wet,stay_wet
+Lual Yak PHCU,8.7701,32.97685,Upper Nile State,Luakpiny/Nasir County,Dingkar Payam,hospital,stay_dry,stay_dry,stay_dry
+Jikmir PHCC,8.45327,33.18926,Upper Nile State,Luakpiny/Nasir County,Jikmir Payam,hospital,stay_dry,stay_dry,stay_dry
+Dhekdhek PHCU,8.652,33.086,Upper Nile State,Luakpiny/Nasir County,Kiech Kuon Payam,hospital,stay_dry,stay_dry,stay_dry
+Kierwan PHCU,8.78224,33.0403,Upper Nile State,Luakpiny/Nasir County,Kiech Kuon Payam,hospital,stay_dry,stay_dry,stay_dry
+Kierwanding PHCU,8.89205,30.73718,Upper Nile State,Luakpiny/Nasir County,Kuerenge-ke Payam,hospital,stay_wet,stay_wet,become_dry
+Malek PHCU,6.06775,31.6054,Upper Nile State,Luakpiny/Nasir County,Kuerenge-ke Payam,hospital,become_wet,stay_dry,stay_dry
+Mandeng PHCU,9.38675,30.83775,Upper Nile State,Luakpiny/Nasir County,Kuerenge-ke Payam,hospital,become_wet,become_wet,become_wet
+Wanding PHCU,8.78475,33.04065,Upper Nile State,Luakpiny/Nasir County,Kuerenge-ke Payam,hospital,stay_dry,stay_dry,stay_dry
+Mading PHCC,8.77329,33.32192,Upper Nile State,Luakpiny/Nasir County,Mading Payam,hospital,stay_dry,stay_dry,stay_dry
+Gurnyang PHCU,8.69635,33.39457,Upper Nile State,Luakpiny/Nasir County,Maker Payam,hospital,stay_dry,stay_dry,stay_dry
+Nasir Hospital,8.61695,33.07412,Upper Nile State,Luakpiny/Nasir County,Nasir Payam,hospital,stay_dry,stay_dry,stay_dry
+Gaireng PHCU,8.89866,33.0286,Upper Nile State,Luakpiny/Nasir County,Roam Payam,hospital,stay_dry,stay_dry,stay_dry
+Homkor PHCU,8.71508,33.08593,Upper Nile State,Luakpiny/Nasir County,Roam Payam,hospital,stay_dry,stay_dry,stay_dry
+Bougaya PHCU,9.6635,33.53236,Upper Nile State,Maban County,Banashowa Payam,hospital,stay_dry,stay_dry,stay_dry
+Dangaji PHCU,9.92692,33.65486,Upper Nile State,Maban County,Banashowa Payam,hospital,stay_dry,stay_dry,stay_dry
+Bunj Hospital,9.95867,33.7112,Upper Nile State,Maban County,Bunj Payam,hospital,stay_dry,stay_dry,stay_dry
+Bunj RI PHCC,9.95841,33.71172,Upper Nile State,Maban County,Bunj Payam,hospital,stay_dry,stay_dry,stay_dry
+Gasm Allah PHCU,9.96715,33.80648,Upper Nile State,Maban County,Bunj Payam,hospital,stay_dry,stay_dry,stay_dry
+Shatta PHCU,9.95856,33.9295,Upper Nile State,Maban County,Bunj Payam,hospital,stay_dry,stay_dry,stay_dry
+Thougji PHCU,9.959548,33.699463,Upper Nile State,Maban County,Bunj Payam,hospital,stay_dry,stay_dry,stay_dry
+Gandrassa PHCC,9.985411,33.612876,Upper Nile State,Maban County,Jinkuata Payam,hospital,stay_dry,stay_dry,stay_dry
+Gentil PHCC,9.988472,33.589026,Upper Nile State,Maban County,Jinkuata Payam,hospital,stay_dry,stay_dry,stay_dry
+Kaya PHCC,10.102936,33.575022,Upper Nile State,Maban County,Jinkuata Payam,hospital,stay_dry,stay_dry,stay_dry
+Kaya PHCU,10.098455,33.590723,Upper Nile State,Maban County,Jinkuata Payam,hospital,stay_dry,stay_dry,stay_dry
+Poumki PHCU,10.254628,33.56184,Upper Nile State,Maban County,Jinkuata Payam,hospital,stay_dry,stay_dry,stay_dry
+Yusuf Batil PHCC,9.976237,33.579057,Upper Nile State,Maban County,Jinkuata Payam,hospital,stay_dry,stay_dry,stay_dry
+Yusuf Batil PHCU,9.974581,33.570377,Upper Nile State,Maban County,Jinkuata Payam,hospital,stay_dry,stay_dry,stay_dry
+Jamam PHCU,10.14391,33.22826,Upper Nile State,Maban County,Jinmakda Payam,hospital,stay_dry,stay_dry,stay_dry
+Benamayo PHCC,9.992819,33.758056,Upper Nile State,Maban County,Khor El Amer Payam,hospital,stay_dry,stay_dry,stay_dry
+Doro Extension PHCU,10.011248,33.768137,Upper Nile State,Maban County,Khor El Amer Payam,hospital,stay_dry,stay_dry,stay_dry
+Doro PHCC,9.983385,33.758965,Upper Nile State,Maban County,Khor El Amer Payam,hospital,stay_dry,stay_dry,stay_dry
+Mayak PHCU,9.983053,33.744339,Upper Nile State,Maban County,Khor El Amer Payam,hospital,stay_dry,stay_dry,stay_dry
+Nilla PHCU,9.9587,33.92865,Upper Nile State,Maban County,Khor El Amer Payam,hospital,stay_dry,stay_dry,stay_dry
+Turuw PHCU,8.49989,33.44138,Upper Nile State,Maiwut County,Jekow Payam,hospital,stay_dry,stay_dry,stay_dry
+Jotome PHCU,8.63958,33.8334,Upper Nile State,Maiwut County,Jotome Payam,hospital,stay_dry,stay_dry,stay_dry
+Wunkir PHCU,9.40688,31.4698,Upper Nile State,Maiwut County,Jotome Payam,hospital,stay_dry,stay_dry,stay_dry
+Nyetok PHCU,8.54366,33.8258,Upper Nile State,Maiwut County,Kigile Payam,hospital,stay_dry,stay_dry,stay_dry
+Malek PHCU,6.06775,31.6054,Upper Nile State,Maiwut County,Olang Payam,hospital,become_wet,stay_dry,stay_dry
+Uleng PHCU,8.7122,33.72748,Upper Nile State,Maiwut County,Olang Payam,hospital,stay_dry,stay_dry,stay_dry
+Pagak PHCC,8.47328,33.02048,Upper Nile State,Maiwut County,Pagak Payam (Maiwut),hospital,stay_wet,stay_wet,stay_wet
+Pinythor PHCU,8.72448,33.85332,Upper Nile State,Maiwut County,Pagak Payam (Maiwut),hospital,stay_dry,stay_dry,stay_dry
+Malakal Teaching Hospital,9.52905,31.65183,Upper Nile State,Malakal County,Central Malakal Payam,hospital,become_wet,stay_dry,stay_dry
+Wau Shilluk PHCU,9.572823,31.675377,Upper Nile State,Malakal County,Ogot Payam,hospital,stay_dry,stay_dry,stay_dry
+Assossa PHCU,9.5155,31.6675,Upper Nile State,Malakal County,Southern Malakal Payam,hospital,stay_dry,stay_dry,stay_dry
+Bam PHCU,9.50336,31.65923,Upper Nile State,Malakal County,Southern Malakal Payam,hospital,become_wet,stay_dry,stay_dry
+Athidwoi PHCU,10.25053,32.24206,Upper Nile State,Manyo County,Athidwoi Payam,hospital,stay_dry,stay_dry,stay_dry
+Ogon PHCU,10.13134,32.27005,Upper Nile State,Manyo County,Athidwoi Payam,hospital,stay_wet,stay_wet,stay_wet
+Kaka PHCC,10.5792,32.15722,Upper Nile State,Manyo County,Kaka Payam,hospital,become_wet,stay_dry,stay_dry
+Thorgwang PHCU,11.00097,32.64244,Upper Nile State,Manyo County,Kaka Payam,hospital,become_wet,stay_dry,stay_dry
+Aweth PHCC,10.34108,32.22313,Upper Nile State,Manyo County,Kwoj Payam,hospital,become_wet,stay_dry,stay_dry
+Wadakona PHCC,11.60823,32.72822,Upper Nile State,Manyo County,Wadakona Payam,hospital,stay_dry,stay_dry,stay_dry
+Pariak PHCU,12.16946,32.78554,Upper Nile State,Melut County,Bimachuk Payam,hospital,stay_dry,stay_dry,stay_dry
+Galdora PHCC,10.27168,32.46344,Upper Nile State,Melut County,Galdora Payam,hospital,stay_dry,stay_dry,stay_dry
+Melut Civil Hospital,10.44445,32.20068,Upper Nile State,Melut County,Melut Payam,hospital,stay_dry,stay_dry,stay_dry
+Paloch PHCC,10.46559,32.54816,Upper Nile State,Melut County,Paloch Payam (Melut),hospital,stay_dry,stay_dry,stay_dry
+Panomdit PHCU,10.240759,32.719678,Upper Nile State,Melut County,Panomdit Payam,hospital,stay_dry,stay_dry,stay_dry
+Wanamum PHCU,10.16979,32.81295,Upper Nile State,Melut County,Wunamum Payam,hospital,stay_dry,stay_dry,stay_dry
+Oweci PHCC,9.43358,31.57575,Upper Nile State,Panyikang County,Dheteim Payam,hospital,become_wet,stay_dry,stay_dry
+Nakdiar PHCU,9.3616,31.31838,Upper Nile State,Panyikang County,Panyikang Payam,hospital,stay_wet,stay_wet,stay_wet
+Pakwar PHCU,9.37612,31.39756,Upper Nile State,Panyikang County,Panyikang Payam,hospital,become_wet,become_wet,stay_dry
+Nyibodo PHCU,9.48722,31.00924,Upper Nile State,Panyikang County,Tonga Payam,hospital,stay_wet,stay_wet,become_dry
+Abukadhra PHCU,11.83029,32.80006,Upper Nile State,Renk County,North Renk Payam,hospital,stay_dry,stay_dry,stay_dry
+Alaka PHCU,12.16947,32.78553,Upper Nile State,Renk County,Geger Payam,hospital,stay_dry,stay_dry,stay_dry
+Chemmedi PHCC,11.51628,32.97073,Upper Nile State,Renk County,Chemmedi Payam,hospital,stay_dry,stay_dry,stay_dry
+ECS PHCC,11.74833,32.806944,Upper Nile State,Renk County,North Renk Payam,hospital,stay_dry,stay_dry,stay_dry
+Gerger PHCC,11.990121,32.75888,Upper Nile State,Renk County,Geger Payam,hospital,stay_dry,stay_dry,stay_dry
+Jalhak PHCC,11.232,32.4139,Upper Nile State,Renk County,Jalhak Payam,hospital,stay_dry,stay_dry,stay_dry
+Jerbana PHCC,12.03827,33.02885,Upper Nile State,Renk County,Geger Payam,hospital,stay_dry,stay_dry,stay_dry
+Molbuk PHCU,11.15651,32.67956,Upper Nile State,Renk County,Jalhak Payam,hospital,stay_dry,stay_dry,stay_dry
+Renk Hospital,11.74912,32.79989,Upper Nile State,Renk County,North Renk Payam,hospital,become_wet,stay_dry,stay_dry
+Romale PHCU,12.076,32.78217,Upper Nile State,Renk County,Geger Payam,hospital,stay_dry,stay_dry,stay_dry
+Doma PHCU,8.8815,32.57286,Upper Nile State,Ulang County,Doma Payam,hospital,become_wet,become_wet,stay_dry
+Ying PHCU,8.79492,33.59609,Upper Nile State,Ulang County,Doma Payam,hospital,stay_dry,stay_dry,stay_dry
+Kuich PHCC,8.6029,32.90587,Upper Nile State,Ulang County,Kurmuot Payam,hospital,become_wet,become_wet,stay_dry
+Dura PHCU,8.79601,32.69981,Upper Nile State,Ulang County,Ulang Payam,hospital,become_wet,stay_dry,stay_dry
+Ulang PHCC,8.65539,32.72171,Upper Nile State,Ulang County,Ulang Payam,hospital,become_wet,stay_dry,stay_dry
+Bimbim PHCU,8.78145,32.8492,Upper Nile State,Ulang County,Yomding Payam,hospital,stay_dry,stay_dry,stay_dry
+Rup Board PHCC,8.66927,32.79126,Upper Nile State,Ulang County,Yomding Payam,hospital,stay_dry,stay_dry,stay_dry
+Yomding PHCC,8.63562,32.83852,Upper Nile State,Ulang County,Yomding Payam,hospital,become_wet,stay_dry,stay_dry
+Awut-Wut PHCU,8.59385,28.61432,Warrap State,Gogrial East County,Nyang Payam,hospital,stay_dry,stay_dry,stay_dry
+Mayom-Bioung PHCU,8.23418,28.59403,Warrap State,Gogrial East County,Pathuon East Payam,hospital,stay_dry,stay_dry,stay_dry
+Yiik Adoor PHCU,8.24721,28.46353,Warrap State,Gogrial East County,Pathuon East Payam,hospital,stay_dry,stay_dry,stay_dry
+Luonyaker County Hospital,8.22963,28.38975,Warrap State,Gogrial East County,Pathuon West Payam,hospital,stay_dry,stay_dry,stay_dry
+Matiel PHCU,8.14511,28.22859,Warrap State,Gogrial East County,Pathuon West Payam,hospital,stay_dry,stay_dry,stay_dry
+Lietnhom DTC PHCC,8.59759,28.4726,Warrap State,Gogrial East County,Toch East Payam,hospital,stay_dry,stay_dry,stay_dry
+Maliai PHCU,8.39322,28.54096,Warrap State,Gogrial East County,Toch East Payam,hospital,stay_dry,stay_dry,stay_dry
+Ajogo PHCU,8.70715,28.4252,Warrap State,Gogrial East County,Toch North Payam,hospital,stay_dry,stay_dry,stay_dry
+Majak-Nyuom PHCC,8.72579,28.5307,Warrap State,Gogrial East County,Toch North Payam,hospital,stay_dry,stay_dry,stay_dry
+Mayom Chol PHCC,8.41054,28.40509,Warrap State,Gogrial East County,Toch North Payam,hospital,stay_dry,stay_dry,stay_dry
+Panacier PHCU,8.615566,28.361063,Warrap State,Gogrial East County,Toch West Payam,hospital,stay_dry,stay_dry,stay_dry
+Pinydit PHCU,8.41557,28.34449,Warrap State,Gogrial East County,Toch West Payam,hospital,stay_dry,stay_dry,stay_dry
+Mayen PHCU,9.01653,27.92304,Warrap State,Gogrial West County,Akon North Payam,hospital,stay_dry,stay_dry,stay_dry
+Akon PHCC,8.887348,27.95695,Warrap State,Gogrial West County,Akon South Payam,hospital,stay_dry,stay_dry,stay_dry
+Mayom PHCU,8.682773,28.27306,Warrap State,Gogrial West County,Alek North Payam,hospital,stay_dry,stay_dry,stay_dry
+Alek PHCC,8.66394,28.14856,Warrap State,Gogrial West County,Alek South Payam,hospital,stay_dry,stay_dry,stay_dry
+Atuk Kuel PHCU,8.64406,27.99594,Warrap State,Gogrial West County,Alek South Payam,hospital,stay_dry,stay_dry,stay_dry
+Keet PHCU,8.81848,28.07093,Warrap State,Gogrial West County,Alek West Payam,hospital,stay_dry,stay_dry,stay_dry
+Gogrial PHCC,8.52683,28.10014,Warrap State,Gogrial West County,Gogrial Payam,hospital,stay_dry,stay_dry,stay_dry
+Maluil Ajak PHCU,8.52884,27.97612,Warrap State,Gogrial West County,Gogrial Payam,hospital,stay_dry,stay_dry,stay_dry
+Ajiep PHCU,8.26555,28.08942,Warrap State,Gogrial West County,Kuac North Payam,hospital,stay_dry,stay_dry,stay_dry
+Kuajok State Hospital,8.299999,28.0,Warrap State,Gogrial West County,Kuac North Payam,hospital,stay_dry,stay_dry,stay_dry
+Mayen Gumel PHCC,8.45276,28.120064,Warrap State,Gogrial West County,Kuac North Payam,hospital,stay_dry,stay_dry,stay_dry
+Magai PHCU,8.10439,28.00818,Warrap State,Gogrial West County,Kuac South Payam,hospital,stay_dry,stay_dry,stay_dry
+Thurnyior PHCU,8.14492,28.13195,Warrap State,Gogrial West County,Kuac South Payam,hospital,stay_dry,stay_dry,stay_dry
+Pakor PHCU,8.93477,28.11781,Warrap State,Gogrial West County,Riau Payam,hospital,stay_dry,stay_dry,stay_dry
+Panliet PHCU,8.84237,28.25539,Warrap State,Gogrial West County,Riau Payam,hospital,stay_dry,stay_dry,stay_dry
+Ananatak PHCU,7.732197,29.025414,Warrap State,Tonj East County,Ananatak Payam,hospital,stay_dry,stay_dry,stay_dry
+Ngapagok PHCC,7.84595,29.09491,Warrap State,Tonj East County,Ananatak Payam,hospital,stay_dry,stay_dry,stay_dry
+Makuac PHCU,7.98747,29.4768,Warrap State,Tonj East County,Makuac Payam,hospital,stay_dry,stay_dry,stay_dry
+Kacuat PHCU,7.94678,29.17935,Warrap State,Tonj East County,Malualcum Payam,hospital,stay_dry,stay_dry,stay_dry
+Mayen Ador PHCU,7.838167,29.2725,Warrap State,Tonj East County,Mayen Payam (Tonj E),hospital,stay_dry,stay_dry,stay_dry
+Palal PHCU,7.71686,28.94012,Warrap State,Tonj East County,Palal Payam,hospital,stay_dry,stay_dry,stay_dry
+Paliang PHCU,7.97757,29.31542,Warrap State,Tonj East County,Paliang Payam,hospital,stay_dry,stay_dry,stay_dry
+Rumabuth PHCC,7.971667,29.285,Warrap State,Tonj East County,Paliang Payam,hospital,stay_dry,stay_dry,stay_dry
+Wuncuai PHCU,8.01639,29.44762,Warrap State,Tonj East County,Paliang Payam,hospital,stay_dry,stay_dry,stay_dry
+Kuelcuk PHCU,8.04948,29.30799,Warrap State,Tonj East County,Paweng Payam,hospital,stay_dry,stay_dry,stay_dry
+Paweng PHCC,8.059667,29.422667,Warrap State,Tonj East County,Paweng Payam,hospital,stay_dry,stay_dry,stay_dry
+Wunlit PHCU,7.84217,29.23152,Warrap State,Tonj East County,Wun-liit Payam,hospital,stay_dry,stay_dry,stay_dry
+Akop PHCC,8.35847,29.16467,Warrap State,Tonj North County,Akop Payam,hospital,stay_dry,stay_dry,stay_dry
+Alabek PHCC,8.53458,28.92701,Warrap State,Tonj North County,Alabek Payam,hospital,stay_dry,stay_dry,stay_dry
+Aliek PHCC,8.39527,28.6873,Warrap State,Tonj North County,Aliek Payam,hospital,stay_dry,stay_dry,stay_dry
+Aporlang PHCU,8.14527,28.54036,Warrap State,Tonj North County,Awuul Payam,hospital,stay_dry,stay_dry,stay_dry
+Awul  PHCC,8.18881,28.73599,Warrap State,Tonj North County,Awuul Payam,hospital,stay_dry,stay_dry,stay_dry
+Pagakdit PHCU,7.99254,28.4979,Warrap State,Tonj North County,Awuul Payam,hospital,stay_dry,stay_dry,stay_dry
+Kirrik PHCU,7.88546,28.81618,Warrap State,Tonj North County,Kirik Payam,hospital,stay_dry,stay_dry,stay_dry
+Fareksika PHCU,7.900386,28.442147,Warrap State,Tonj North County,Manloor Payam,hospital,stay_dry,stay_dry,stay_dry
+Pankot PHCU,8.122323,28.393121,Warrap State,Tonj North County,Manloor Payam,hospital,stay_dry,stay_dry,stay_dry
+Marial Lou Hospital,8.04281,29.18986,Warrap State,Tonj North County,Marial Lou Payam,hospital,stay_dry,stay_dry,stay_dry
+Lurchuk PHCU,7.83118,28.44726,Warrap State,Tonj North County,Pagol Payam,hospital,stay_dry,stay_dry,stay_dry
+Pagol PHCU,7.69988,28.5802,Warrap State,Tonj North County,Pagol Payam,hospital,stay_dry,stay_dry,stay_dry
+Rualbet PHCU,8.11706,28.94149,Warrap State,Tonj North County,Rual-bet Payam,hospital,stay_dry,stay_dry,stay_dry
+Warrap  PHCC,8.08953,28.63808,Warrap State,Tonj North County,Warrap Payam,hospital,stay_dry,stay_dry,stay_dry
+Jak PHCU,7.66649,28.70149,Warrap State,Tonj South County,Jak Payam,hospital,stay_dry,stay_dry,stay_dry
+Manyiel-Thonny PHCU,7.38818,28.97801,Warrap State,Tonj South County,Manyang-ngok Payam,hospital,stay_dry,stay_dry,stay_dry
+Panakdit PHCU,7.69809,28.7701,Warrap State,Tonj South County,Thiet Payam,hospital,stay_dry,stay_dry,stay_dry
+Thiet PHCC,7.60818,28.81046,Warrap State,Tonj South County,Thiet Payam,hospital,stay_dry,stay_dry,stay_dry
+Aguka PHCU,6.97993,28.71626,Warrap State,Tonj South County,Tonj Payam,hospital,stay_dry,stay_dry,stay_dry
+Malual Muok PHCU,7.3994,28.74102,Warrap State,Tonj South County,Tonj Payam,hospital,stay_dry,stay_dry,stay_dry
+Tonj Hospital,7.2767,28.67984,Warrap State,Tonj South County,Tonj Payam,hospital,stay_dry,stay_dry,stay_dry
+Mabior yar PHCU,7.48179,28.78437,Warrap State,Tonj South County,Wath-alel Payam,hospital,stay_dry,stay_dry,stay_dry
+Pawel PHCU,7.56307,28.72435,Warrap State,Tonj South County,Wath-alel Payam,hospital,stay_dry,stay_dry,stay_dry
+Wanh Alel PHCU,7.48415,28.84859,Warrap State,Tonj South County,Wath-alel Payam,hospital,stay_dry,stay_dry,stay_dry
+Ajak Kuach PHCC,9.29088,28.70991,Warrap State,Twic County,Ajak-kuac Payam,hospital,stay_dry,stay_dry,stay_dry
+Molbang PHCU,9.2529,28.68295,Warrap State,Twic County,Ajak-kuac Payam,hospital,stay_dry,stay_dry,stay_dry
+Akoc PHCC,9.14366,28.02144,Warrap State,Twic County,Akoc Payam,hospital,stay_dry,stay_dry,stay_dry
+Toch Noon PHCC,9.08858,27.98456,Warrap State,Twic County,Akoc Payam,hospital,stay_dry,stay_dry,stay_dry
+Yiik Thon PHCC,9.23583,28.05395,Warrap State,Twic County,Akoc Payam,hospital,stay_dry,stay_dry,stay_dry
+Aweng PHCC,9.09878,28.55953,Warrap State,Twic County,Aweeng Payam,hospital,stay_dry,stay_dry,stay_dry
+Majook Noon PHCC,9.20329,28.58958,Warrap State,Twic County,Aweeng Payam,hospital,stay_dry,stay_dry,stay_dry
+Maper Centre PHCC,9.1054647,28.4979675,Warrap State,Twic County,Aweeng Payam,hospital,stay_dry,stay_dry,stay_dry
+Marial Maper PHCC,9.16903,28.51294,Warrap State,Twic County,Aweeng Payam,hospital,stay_dry,stay_dry,stay_dry
+Akak PHCC,9.0687,28.11443,Warrap State,Twic County,Pannyok Payam,hospital,stay_dry,stay_dry,stay_dry
+Majak Pagai PHCC,9.17019,28.22664,Warrap State,Twic County,Pannyok Payam,hospital,stay_dry,stay_dry,stay_dry
+Pan-Nyok PHCC,9.08483,28.20681,Warrap State,Twic County,Pannyok Payam,hospital,stay_dry,stay_dry,stay_dry
+Tuele PHCC,8.997184,28.211872,Warrap State,Twic County,Pannyok Payam,hospital,stay_dry,stay_dry,stay_dry
+Anyiel Kuac PHCC,9.25994,28.5385,Warrap State,Twic County,Turalei Payam,hospital,stay_dry,stay_dry,stay_dry
+Magak PHCC,8.89666,28.34731,Warrap State,Twic County,Turalei Payam,hospital,stay_dry,stay_dry,stay_dry
+Mother Theresa General Hospital,9.09488,28.42433,Warrap State,Twic County,Turalei Payam,hospital,stay_dry,stay_dry,stay_dry
+Turalei PHCC,9.09552,28.4302,Warrap State,Twic County,Turalei Payam,hospital,stay_dry,stay_dry,stay_dry
+Malou-Hol PHCU,9.13445,28.26907,Warrap State,Twic County,Wunrok Payam,hospital,stay_dry,stay_dry,stay_dry
+Mayen Abun PHCC,9.16251,28.36225,Warrap State,Twic County,Wunrok Payam,hospital,stay_dry,stay_dry,stay_dry
+Wunrok PHCC,8.9928,28.29156,Warrap State,Twic County,Wunrok Payam,hospital,stay_dry,stay_dry,stay_dry
+Alelthony PHCC,8.27767,27.85517,Western Bahr El Ghazal State,Jur River County,Kangi Payam,hospital,stay_dry,stay_dry,stay_dry
+Kangi PHCC,8.14523,27.65892,Western Bahr El Ghazal State,Jur River County,Kangi Payam,hospital,stay_dry,stay_dry,stay_dry
+Kuajena PHCC,7.50804,28.26975,Western Bahr El Ghazal State,Jur River County,Kuajiena Payam,hospital,stay_dry,stay_dry,stay_dry
+Mapel PHCC,7.296,28.43921,Western Bahr El Ghazal State,Jur River County,Kuajiena Payam,hospital,stay_dry,stay_dry,stay_dry
+Mbili PHCU,7.51899,28.19623,Western Bahr El Ghazal State,Jur River County,Kuajiena Payam,hospital,stay_dry,stay_dry,stay_dry
+Achong Chong PHCC,7.92934,28.17447,Western Bahr El Ghazal State,Jur River County,Marial Bai Payam,hospital,stay_dry,stay_dry,stay_dry
+Marial Bai PHCC,7.89063,27.97841,Western Bahr El Ghazal State,Jur River County,Marial Bai Payam,hospital,stay_dry,stay_dry,stay_dry
+East Bank PHCC,7.70752,28.02515,Western Bahr El Ghazal State,Jur River County,Rocrocdong Payam,hospital,stay_dry,stay_dry,stay_dry
+RocRoc Dong PHCU,7.78218,28.11294,Western Bahr El Ghazal State,Jur River County,Rocrocdong Payam,hospital,stay_dry,stay_dry,stay_dry
+Udici County Hospital,8.06978,27.72219,Western Bahr El Ghazal State,Jur River County,Udici Payam,hospital,stay_dry,stay_dry,stay_dry
+Nyinakok PHCU,7.92325,28.03379,Western Bahr El Ghazal State,Jur River County,Wau Bai Payam,hospital,stay_dry,stay_dry,stay_dry
+Tharkueng PHCC,8.01116,27.99872,Western Bahr El Ghazal State,Jur River County,Wau Bai Payam,hospital,stay_dry,stay_dry,stay_dry
+Timsah PHCC,9.54947,25.48084,Western Bahr El Ghazal State,Raga County,Ere Payam,hospital,stay_dry,stay_dry,stay_dry
+Deleba PHCU,8.78998,26.04838,Western Bahr El Ghazal State,Raga County,Raga Payam,hospital,stay_dry,stay_dry,stay_dry
+Raja Hospital,8.46925,25.67662,Western Bahr El Ghazal State,Raga County,Raga Payam,hospital,stay_dry,stay_dry,stay_dry
+Boro Medina PHCC,8.46407,24.81583,Western Bahr El Ghazal State,Raga County,Ringi Payam,hospital,stay_dry,stay_dry,stay_dry
+Katta PHCU,8.440571,25.003206,Western Bahr El Ghazal State,Raga County,Ringi Payam,hospital,stay_dry,stay_dry,stay_dry
+Menamba PHCU,8.48413,25.19723,Western Bahr El Ghazal State,Raga County,Ringi Payam,hospital,stay_dry,stay_dry,stay_dry
+Abul PHCU,7.431833,26.41554,Western Bahr El Ghazal State,Raga County,Uyujuku Payam,hospital,stay_dry,stay_dry,stay_dry
+Deim Zubeir PHCC,7.71458,26.19593,Western Bahr El Ghazal State,Raga County,Uyujuku Payam,hospital,stay_dry,stay_dry,stay_dry
+Kuru PHCC,7.71858,26.49702,Western Bahr El Ghazal State,Raga County,Uyujuku Payam,hospital,stay_dry,stay_dry,stay_dry
+Mangayat PHCU,8.22319,25.86001,Western Bahr El Ghazal State,Raga County,Uyujuku Payam,hospital,stay_dry,stay_dry,stay_dry
+Sopo PHCU,8.02544,26.04428,Western Bahr El Ghazal State,Raga County,Uyujuku Payam,hospital,stay_dry,stay_dry,stay_dry
+Hai Dinka PHCC,7.71471,27.9988,Western Bahr El Ghazal State,Wau County,Wau North Payam,hospital,stay_dry,stay_dry,stay_dry
+Lokoloko PHCC,7.69551,27.97522,Western Bahr El Ghazal State,Wau County,Wau North Payam,hospital,stay_dry,stay_dry,stay_dry
+Muktah PHCC,7.70666,27.99438,Western Bahr El Ghazal State,Wau County,Wau North Payam,hospital,stay_dry,stay_dry,stay_dry
+Wau Sika Hadid PHCC,7.71394,27.98782,Western Bahr El Ghazal State,Wau County,Wau North Payam,hospital,stay_dry,stay_dry,stay_dry
+Agok PHCC,7.627767,28.023897,Western Bahr El Ghazal State,Wau County,Wau South Payam,hospital,stay_dry,stay_dry,stay_dry
+Aljazeira PHCC,7.686375,27.977669,Western Bahr El Ghazal State,Wau County,Wau South Payam,hospital,stay_dry,stay_dry,stay_dry
+Bazia Jedid PHCC,7.67869,27.99417,Western Bahr El Ghazal State,Wau County,Wau South Payam,hospital,stay_dry,stay_dry,stay_dry
+Wau Teaching Hospital,7.69702,28.00446,Western Bahr El Ghazal State,Wau County,Wau South Payam,hospital,stay_dry,stay_dry,stay_dry
+Andari PHCU,4.94728,27.7254,Western Equatoria State,Ezo County,Andari Payam,hospital,stay_dry,stay_dry,stay_dry
+Bafuka PHCU,4.97822,27.7804,Western Equatoria State,Ezo County,Andari Payam,hospital,stay_dry,stay_dry,stay_dry
+Bangangai PHCU,4.918405,27.716547,Western Equatoria State,Ezo County,Andari Payam,hospital,stay_dry,stay_dry,stay_dry
+Baragu PHCU,4.982557,27.688099,Western Equatoria State,Ezo County,Andari Payam,hospital,stay_dry,stay_dry,stay_dry
+Bagidi PHCU,5.18261,27.66991,Western Equatoria State,Ezo County,Bagidi Payam,hospital,stay_dry,stay_dry,stay_dry
+Moso PHCU,5.201241,27.926925,Western Equatoria State,Ezo County,Bagidi Payam,hospital,stay_dry,stay_dry,stay_dry
+Bambaraze PHCU,5.174159,27.393533,Western Equatoria State,Ezo County,Bariguna Payam,hospital,stay_dry,stay_dry,stay_dry
+Banduguyo PHCU,5.177448,27.442381,Western Equatoria State,Ezo County,Bariguna Payam,hospital,stay_dry,stay_dry,stay_dry
+Bariabande PHCU,4.982395,27.688003,Western Equatoria State,Ezo County,Bariguna Payam,hospital,stay_dry,stay_dry,stay_dry
+Bariguna PHCU,5.318322,27.27382,Western Equatoria State,Ezo County,Bariguna Payam,hospital,stay_dry,stay_dry,stay_dry
+Baikpa PHCU,5.09535,27.47464,Western Equatoria State,Ezo County,Ezo Centre Payam,hospital,stay_dry,stay_dry,stay_dry
+Ezo Hospital,5.07711,27.46581,Western Equatoria State,Ezo County,Ezo Centre Payam,hospital,stay_dry,stay_dry,stay_dry
+Madoro PHCC,5.07049,27.5349,Western Equatoria State,Ezo County,Ezo Centre Payam,hospital,stay_dry,stay_dry,stay_dry
+Nanzinga PHCU,4.923133,28.032132,Western Equatoria State,Ezo County,Ezo Centre Payam,hospital,stay_dry,stay_dry,stay_dry
+Diabio PHCU,4.97167,28.02514,Western Equatoria State,Ezo County,Naandi Payam,hospital,stay_dry,stay_dry,stay_dry
+Naandi PHCC,5.972244,27.911891,Western Equatoria State,Ezo County,Naandi Payam,hospital,stay_dry,stay_dry,stay_dry
+Nagasi PHCU,4.815416,27.901414,Western Equatoria State,Ezo County,Naandi Payam,hospital,stay_dry,stay_dry,stay_dry
+Nyasi PHCU,4.858983,27.87545,Western Equatoria State,Ezo County,Naandi Payam,hospital,stay_dry,stay_dry,stay_dry
+Mafuyu PHCU,4.814246,27.867815,Western Equatoria State,Ezo County,Yangiri Payam,hospital,stay_dry,stay_dry,stay_dry
+Yangiri PHCC,5.1815,27.956068,Western Equatoria State,Ezo County,Yangiri Payam,hospital,stay_dry,stay_dry,stay_dry
+Yangura PHCU,5.145087,27.976455,Western Equatoria State,Ezo County,Yangiri Payam,hospital,stay_dry,stay_dry,stay_dry
+Ibba PHCC,4.79144,29.13352,Western Equatoria State,Ibba County,Ibba Centre Payam,hospital,stay_dry,stay_dry,stay_dry
+Madebe PHCC,4.798489,28.997605,Western Equatoria State,Ibba County,Madebe Payam,hospital,stay_dry,stay_dry,stay_dry
+Marko PHCU,4.7983,29.05345,Western Equatoria State,Ibba County,Madebe Payam,hospital,stay_dry,stay_dry,stay_dry
+Tanamuko PHCU,5.139959,28.777478,Western Equatoria State,Ibba County,Maruko Payam,hospital,stay_dry,stay_dry,stay_dry
+Bamani PHCU,4.540436,29.171744,Western Equatoria State,Ibba County,Nabanga Payam,hospital,stay_dry,stay_dry,stay_dry
+Nabanga PHCC,4.4886,29.0865,Western Equatoria State,Ibba County,Nabanga Payam,hospital,stay_dry,stay_dry,stay_dry
+Chochoro PHCU,4.99978,29.45599,Western Equatoria State,Maridi County,Kozi Payam,hospital,stay_dry,stay_dry,stay_dry
+Kozi PHCU,5.507823,29.71164,Western Equatoria State,Maridi County,Kozi Payam,hospital,stay_dry,stay_dry,stay_dry
+Woko PHCC,5.36308,29.61889,Western Equatoria State,Maridi County,Kozi Payam,hospital,stay_dry,stay_dry,stay_dry
+Dukudu-olo PHCC,4.590831,29.863647,Western Equatoria State,Maridi County,Landili Payam,hospital,stay_dry,stay_dry,stay_dry
+Olo PHCC,5.08196,29.8293,Western Equatoria State,Maridi County,Mambe Payam,hospital,stay_dry,stay_dry,stay_dry
+Betha Saida ECS PHCC,4.91144,29.45147,Western Equatoria State,Maridi County,Maridi Payam,hospital,stay_dry,stay_dry,stay_dry
+Maridi Hospital,4.91598,29.46424,Western Equatoria State,Maridi County,Maridi Payam,hospital,stay_dry,stay_dry,stay_dry
+Dosho PHCU,5.46493,30.4652,Western Equatoria State,Mundri East County,Kediba Payam,hospital,stay_dry,stay_dry,stay_dry
+Kediba PHCC,5.51262,30.7255,Western Equatoria State,Mundri East County,Kediba Payam,hospital,stay_dry,stay_dry,stay_dry
+Movo PHCU,5.38812,30.6357,Western Equatoria State,Mundri East County,Kediba Payam,hospital,stay_dry,stay_dry,stay_dry
+Wandi PHCU,5.49608,30.64355,Western Equatoria State,Mundri East County,Kediba Payam,hospital,stay_dry,stay_dry,stay_dry
+Kasiko PHCU,5.72144,30.600798,Western Equatoria State,Mundri East County,Lakamadi Payam,hospital,stay_dry,stay_dry,stay_dry
+Lakamadi PHCC,5.66781,30.48836,Western Equatoria State,Mundri East County,Lakamadi Payam,hospital,stay_dry,stay_dry,stay_dry
+Gabat PHCU,5.35055,30.3254,Western Equatoria State,Mundri East County,Lozoh Payam,hospital,stay_dry,stay_dry,stay_dry
+Lanyi PHCC,5.24809,30.50873,Western Equatoria State,Mundri East County,Lozoh Payam,hospital,stay_dry,stay_dry,stay_dry
+Lozoh PHCU,5.15719,30.44674,Western Equatoria State,Mundri East County,Lozoh Payam,hospital,stay_dry,stay_dry,stay_dry
+Lui Hospital,5.34281,30.44867,Western Equatoria State,Mundri East County,Lozoh Payam,hospital,stay_dry,stay_dry,stay_dry
+Wiroh PHCU,5.30905,30.56016,Western Equatoria State,Mundri East County,Lozoh Payam,hospital,stay_dry,stay_dry,stay_dry
+Agyi PHCU,5.40425,30.86031,Western Equatoria State,Mundri East County,Minga Payam,hospital,stay_dry,stay_dry,stay_dry
+Minga PHCC,5.30102,30.86585,Western Equatoria State,Mundri East County,Minga Payam,hospital,stay_dry,stay_dry,stay_dry
+Kporoloo PHCU,5.091139,30.682279,Western Equatoria State,Mundri East County,Witto Payam,hospital,stay_dry,stay_dry,stay_dry
+Miriba PHCU,5.064955,30.73201,Western Equatoria State,Mundri East County,Witto Payam,hospital,stay_dry,stay_dry,stay_dry
+Amadi PHCU,5.51897,30.3353,Western Equatoria State,Mundri West County,Amadi Payam,hospital,stay_dry,stay_dry,stay_dry
+Bitti PHCU,5.56992,30.43743,Western Equatoria State,Mundri West County,Amadi Payam,hospital,stay_dry,stay_dry,stay_dry
+Bongolo PHCC,4.82779,30.30092,Western Equatoria State,Mundri West County,Bangolo Payam,hospital,stay_dry,stay_dry,stay_dry
+Ledingwa PHCU,4.94911,30.33421,Western Equatoria State,Mundri West County,Bangolo Payam,hospital,stay_dry,stay_dry,stay_dry
+Bari PHCU,5.22814,30.39518,Western Equatoria State,Mundri West County,Kotobi Payam,hospital,stay_dry,stay_dry,stay_dry
+Garia PHCU,5.03348,30.32796,Western Equatoria State,Mundri West County,Kotobi Payam,hospital,stay_dry,stay_dry,stay_dry
+Goribalau PHCU,5.185131,30.19741,Western Equatoria State,Mundri West County,Kotobi Payam,hospital,stay_dry,stay_dry,stay_dry
+Karika PHCU,5.12996,30.03831,Western Equatoria State,Mundri West County,Kotobi Payam,hospital,stay_dry,stay_dry,stay_dry
+Kotobi PHCC,5.24275,30.20099,Western Equatoria State,Mundri West County,Kotobi Payam,hospital,stay_dry,stay_dry,stay_dry
+Gulu PHCU,5.36682,30.15927,Western Equatoria State,Mundri West County,Mundri Payam,hospital,stay_dry,stay_dry,stay_dry
+Mbara PHCU,5.3867,30.26264,Western Equatoria State,Mundri West County,Mundri Payam,hospital,stay_dry,stay_dry,stay_dry
+Mundri PHCC,5.346534,30.320864,Western Equatoria State,Mundri West County,Mundri Payam,hospital,stay_dry,stay_dry,stay_dry
+Bogori PHCC,5.74054,29.84751,Western Equatoria State,Mvolo County,Bagori Payam,hospital,stay_dry,stay_dry,stay_dry
+Gira PHCU,5.89688,29.89534,Western Equatoria State,Mvolo County,Bagori Payam,hospital,stay_dry,stay_dry,stay_dry
+Bahr Grindi PHCC,6.14073,30.17776,Western Equatoria State,Mvolo County,Bahr El Grindi Payam,hospital,stay_dry,stay_dry,stay_dry
+Lali PHCU,6.21154,30.08167,Western Equatoria State,Mvolo County,Bahr El Grindi Payam,hospital,stay_dry,stay_dry,stay_dry
+Dari PHCC,5.82114,30.35665,Western Equatoria State,Mvolo County,Dari Payam,hospital,stay_dry,stay_dry,stay_dry
+Kombi PHCU,6.2903,29.938218,Western Equatoria State,Mvolo County,Kokori Payam,hospital,stay_dry,stay_dry,stay_dry
+Kulu PHCC,6.22982,29.93665,Western Equatoria State,Mvolo County,Kokori Payam,hospital,stay_dry,stay_dry,stay_dry
+Lesi PHCC,5.88233,30.30093,Western Equatoria State,Mvolo County,Lessi Payam,hospital,stay_dry,stay_dry,stay_dry
+Domeri PHCU,5.96577,30.35665,Western Equatoria State,Mvolo County,Mvolo Payam,hospital,stay_dry,stay_dry,stay_dry
+Mvolo County Hospital,6.05965,29.96053,Western Equatoria State,Mvolo County,Mvolo Payam,hospital,stay_dry,stay_dry,stay_dry
+Yeri PHCC,5.78467,30.1043,Western Equatoria State,Mvolo County,Yeri Payam,hospital,stay_dry,stay_dry,stay_dry
+Duma PHCC,5.81782,27.5758,Western Equatoria State,Nagero County,Duma Payam,hospital,stay_dry,stay_dry,stay_dry
+Bandala PHCU,6.116881,27.72267,Western Equatoria State,Nagero County,Nagero Payam,hospital,stay_dry,stay_dry,stay_dry
+Kuro PHCU,6.242303,27.734034,Western Equatoria State,Nagero County,Nagero Payam,hospital,stay_dry,stay_dry,stay_dry
+Maringindo PHCU,6.182791,27.443532,Western Equatoria State,Nagero County,Nagero Payam,hospital,stay_dry,stay_dry,stay_dry
+Nagero PHCC,6.3876,27.76498,Western Equatoria State,Nagero County,Nagero Payam,hospital,stay_dry,stay_dry,stay_dry
+Bassan PHCU,6.042,27.19969,Western Equatoria State,Nagero County,Namutina Payam,hospital,stay_dry,stay_dry,stay_dry
+Dangu PHCU,6.4733,27.73456,Western Equatoria State,Nagero County,Namutina Payam,hospital,stay_dry,stay_dry,stay_dry
+Guruvanza PHCU,6.0026,27.29813,Western Equatoria State,Nagero County,Namutina Payam,hospital,stay_dry,stay_dry,stay_dry
+Namutina PHCC,6.4733,27.73456,Western Equatoria State,Nagero County,Namutina Payam,hospital,stay_dry,stay_dry,stay_dry
+Ngogala PHCU,6.00095,27.07354,Western Equatoria State,Nagero County,Namutina Payam,hospital,stay_dry,stay_dry,stay_dry
+Ngonzorono PHCU,5.87356,27.38218,Western Equatoria State,Nagero County,Namutina Payam,hospital,stay_dry,stay_dry,stay_dry
+Basukangbi PHCC,4.68345,28.0542,Western Equatoria State,Nzara County,Basukangbi Payam,hospital,stay_dry,stay_dry,stay_dry
+Nzara PHCC,4.64211,28.24813,Western Equatoria State,Nzara County,Nzara Centre Payam,hospital,stay_dry,stay_dry,stay_dry
+Yabuwa PHCU,4.64925,28.26809,Western Equatoria State,Nzara County,Nzara Centre Payam,hospital,stay_dry,stay_dry,stay_dry
+Ringasi PHCC,4.92856,28.17807,Western Equatoria State,Nzara County,Ringasi Payam,hospital,stay_dry,stay_dry,stay_dry
+Nangirimo PHCU,4.4698,28.20638,Western Equatoria State,Nzara County,Sakure Payam,hospital,stay_dry,stay_dry,stay_dry
+Sakure PHCC,4.39657,28.21161,Western Equatoria State,Nzara County,Sakure Payam,hospital,stay_dry,stay_dry,stay_dry
+Sangua Two PHCU,4.62034,28.21298,Western Equatoria State,Nzara County,Sangua Payam,hospital,stay_dry,stay_dry,stay_dry
+Mabia PHCU,5.56203,27.52416,Western Equatoria State,Tambura County,Mupoi Payam,hospital,stay_dry,stay_dry,stay_dry
+Mupoi PHCC,5.562197,27.524122,Western Equatoria State,Tambura County,Mupoi Payam,hospital,stay_dry,stay_dry,stay_dry
+Nangongo PHCU,5.625969,27.475111,Western Equatoria State,Tambura County,Mupoi Payam,hospital,stay_dry,stay_dry,stay_dry
+Bambu PHCU,5.45248,27.34636,Western Equatoria State,Tambura County,Rii - Yubu Payam,hospital,stay_dry,stay_dry,stay_dry
+Mabenge PHCU,5.496564,27.297333,Western Equatoria State,Tambura County,Rii - Yubu Payam,hospital,stay_dry,stay_dry,stay_dry
+Ngboko PHCU,5.39105,27.29914,Western Equatoria State,Tambura County,Rii - Yubu Payam,hospital,stay_dry,stay_dry,stay_dry
+Source Yubu PHCC,5.3885,27.25123,Western Equatoria State,Tambura County,Rii - Yubu Payam,hospital,stay_dry,stay_dry,stay_dry
+Akpa PHCU,5.568864,27.340872,Western Equatoria State,Tambura County,Tambura Payam,hospital,stay_dry,stay_dry,stay_dry
+Bakiringba PHCU,5.651261,27.410853,Western Equatoria State,Tambura County,Tambura Payam,hospital,stay_dry,stay_dry,stay_dry
+Dingimo PHCU,5.606425,27.348189,Western Equatoria State,Tambura County,Tambura Payam,hospital,stay_dry,stay_dry,stay_dry
+Gamunakpe PHCU,5.572917,27.496853,Western Equatoria State,Tambura County,Tambura Payam,hospital,stay_dry,stay_dry,stay_dry
+Mabaiku PHCU,5.56584,27.43262,Western Equatoria State,Tambura County,Tambura Payam,hospital,stay_dry,stay_dry,stay_dry
+Mangburu PHCU,5.65999,27.50468,Western Equatoria State,Tambura County,Tambura Payam,hospital,stay_dry,stay_dry,stay_dry
+Matakurungu PHCU,5.579233,27.457069,Western Equatoria State,Tambura County,Tambura Payam,hospital,stay_dry,stay_dry,stay_dry
+Matato PHCU,5.6261,27.40621,Western Equatoria State,Tambura County,Tambura Payam,hospital,stay_dry,stay_dry,stay_dry
+Nabaria PHCU,5.634566,27.447814,Western Equatoria State,Tambura County,Tambura Payam,hospital,stay_dry,stay_dry,stay_dry
+Nzama PHCU,5.61989,27.52509,Western Equatoria State,Tambura County,Tambura Payam,hospital,stay_dry,stay_dry,stay_dry
+Sinakpuro PHCU,5.590556,27.405381,Western Equatoria State,Tambura County,Tambura Payam,hospital,stay_dry,stay_dry,stay_dry
+Tambura County Hospital,5.60033,27.47496,Western Equatoria State,Tambura County,Tambura Payam,hospital,stay_dry,stay_dry,stay_dry
+Tambura PHCC,5.59978,27.47544,Western Equatoria State,Tambura County,Tambura Payam,hospital,stay_dry,stay_dry,stay_dry
+Bangasu PHCC,4.79223,28.77672,Western Equatoria State,Yambio County,Bangasu Payam,hospital,stay_dry,stay_dry,stay_dry
+Gangura PHCC,4.44694,28.48719,Western Equatoria State,Yambio County,Gangura Payam,hospital,stay_dry,stay_dry,stay_dry
+Nadiagere PHCC,5.445507,28.34082,Western Equatoria State,Yambio County,Nadiangere Payam,hospital,stay_dry,stay_dry,stay_dry
+Li Rangu PHCC,4.72769,28.35958,Western Equatoria State,Yambio County,Ri-rangu Payam,hospital,stay_dry,stay_dry,stay_dry
+Bazungua PHCC,4.59198,28.45173,Western Equatoria State,Yambio County,Yambio Town Payam,hospital,stay_dry,stay_dry,stay_dry
+Saura one PHCU,4.62305,28.33791,Western Equatoria State,Yambio County,Yambio Town Payam,hospital,stay_dry,stay_dry,stay_dry
+Yambio PHCC,4.5665,28.3975,Western Equatoria State,Yambio County,Yambio Town Payam,hospital,stay_dry,stay_dry,stay_dry
+Yambio State Hospital,4.57213,28.39549,Western Equatoria State,Yambio County,Yambio Town Payam,hospital,stay_dry,stay_dry,stay_dry

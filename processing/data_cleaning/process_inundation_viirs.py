@@ -5,6 +5,8 @@ import calendar
 import logging
 import time
 from datetime import datetime
+from io import StringIO
+from pathlib import Path
 from urllib.parse import urljoin
 
 # Import data manipulation libraries
@@ -14,6 +16,7 @@ import pandas as pd
 # Import geospatial libraries
 import geopandas as gpd
 import rasterio
+from rasterio.features import rasterize
 
 # Import client libraries
 import requests
@@ -39,18 +42,37 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # -----------------------------------------------------------------------------
 
 VIIRS_BASE_URL = get_cfg(
-    "sources.viirs_base_url",
-    "https://edcftp.cr.usgs.gov/project/FEWSNET/"
-    "spervez/Togofiles/SouthSudan/UofReading/Geotiffs/",
+    "sources.viirs_final_base_url",
+    get_cfg(
+        "sources.viirs_base_url",
+        "https://gws-access.jasmin.ac.uk/public/tamsat/INFLOW/"
+        "south-sudan_flood-maps/v2.0/final/",
+    ),
+)
+VIIRS_PRELIM_BASE_URL = get_cfg(
+    "sources.viirs_prelim_base_url",
+    "https://gws-access.jasmin.ac.uk/public/tamsat/INFLOW/"
+    "south-sudan_flood-maps/v2.0/prelim/",
+)
+VIIRS_PRELIM_CATALOGUE_URL = get_cfg(
+    "sources.viirs_prelim_catalogue_url",
+    urljoin(VIIRS_PRELIM_BASE_URL, "prelim_versions.csv"),
 )
 
 VIIRS_PERIOD_ORDER = {
-    "Mid": 0,
-    "Shm": 1,
-    "End": 2,
+    "D1": 0,
+    "D2": 1,
+    "D3": 2,
 }
 
+VIIRS_DATASET_VERSION = "2.0"
+VIIRS_CADENCE = "dekadal"
+
 VIIRS_DOWNLOAD_PATH = get_cfg("paths.downloads.inundation_viirs", "data/downloads/inundation_masks_viirs")
+VIIRS_PRELIM_DOWNLOAD_PATH = get_cfg(
+    "paths.downloads.inundation_viirs_prelim",
+    "data/downloads/inundation_masks_viirs_prelim",
+)
 VIIRS_H5_PATH = get_cfg("paths.historic.viirs_h5", "data/historic/inundation_viirs.h5")
 VIIRS_TEMPORAL_PATH = get_cfg(
     "paths.historic.viirs_temporal",
@@ -63,66 +85,68 @@ INFLOW_CATCHMENTS_PATH = get_cfg(
 )
 
 
+def _request_with_retries(url, *, stream=False):
+    retries = int(get_cfg("runtime.viirs.request_retries", 3))
+    delay_seconds = float(get_cfg("runtime.viirs.retry_delay_seconds", 2))
+    timeout = float(get_cfg("runtime.viirs.request_timeout_seconds", 120))
+    last_error = None
+    for attempt in range(1, retries + 1):
+        try:
+            response = requests.get(
+                url,
+                stream=stream,
+                timeout=(20, timeout),
+                headers={"User-Agent": "INFLOW-AI/1.0"},
+            )
+            response.raise_for_status()
+            return response
+        except requests.RequestException as error:
+            last_error = error
+            if attempt < retries:
+                time.sleep(delay_seconds * (2 ** (attempt - 1)))
+    raise RuntimeError(f"Unable to download VIIRS resource {url}: {last_error}") from last_error
+
+
 def parse_viirs_filename(file_name):
     """
     Parse a VIIRS inundation filename.
 
-    Expected patterns:
-        FldYYYYMid_MM.tif
-        FldYYYYShm_MM.tif
-        FldYYYYEnd_MM.tif
+    The v2 archive uses dekadal dates. Dates embedded anywhere in a TIFF
+    filename are accepted as YYYY-MM-DD or YYYYMMDD; YYYYMMd1/d2/d3 is also
+    supported. Only dekad starts (days 1, 11 and 21) are valid.
 
     Returns:
         dict with year, month, period_type, period_order, period_id, and date fields.
     """
-    fld_pattern = r"^Fld(?P<year>\d{4})(?P<period>Mid|Shm|End)_(?P<month>\d{2})\.tif$"
-    date_pattern = r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})\.tif$"
-
-    fld_match = re.match(fld_pattern, file_name, flags=re.IGNORECASE)
-    date_match = re.match(date_pattern, file_name, flags=re.IGNORECASE)
-
-    if fld_match:
-        year = int(fld_match.group("year"))
-        month = int(fld_match.group("month"))
-        period_type = fld_match.group("period").capitalize()
-        period_order = VIIRS_PERIOD_ORDER[period_type]
-        _, last_day = calendar.monthrange(year, month)
-
-        if period_type == "Mid":
-            period_start = datetime(year, month, 1).date()
-            period_end = datetime(year, month, 15).date()
-        elif period_type == "Shm":
-            period_start = datetime(year, month, 16).date()
-            period_end = datetime(year, month, last_day).date()
-        else:  # End
-            period_start = datetime(year, month, 1).date()
-            period_end = datetime(year, month, last_day).date()
-
-        period_id = f"{year:04d}-{month:02d}-{period_type.lower()}"
-    elif date_match:
-        year = int(date_match.group("year"))
-        month = int(date_match.group("month"))
-        day = int(date_match.group("day"))
-        _, last_day = calendar.monthrange(year, month)
-        period_start = datetime(year, month, day).date()
-
-        if day == 1:
-            period_type = "Mid"
-            period_order = VIIRS_PERIOD_ORDER[period_type]
-            period_end = datetime(year, month, 15).date()
-            period_id = f"{year:04d}-{month:02d}-mid"
-        elif day == 16:
-            period_type = "Shm"
-            period_order = VIIRS_PERIOD_ORDER[period_type]
-            period_end = datetime(year, month, last_day).date()
-            period_id = f"{year:04d}-{month:02d}-shm"
-        else:
-            period_type = "Unknown"
-            period_order = 99
-            period_end = period_start
-            period_id = period_start.isoformat()
+    basename = os.path.basename(file_name)
+    date_match = re.search(
+        r"(?<!\d)(?P<year>(?:19|20)\d{2})[-_]?(?P<month>0[1-9]|1[0-2])"
+        r"[-_]?(?P<day>0[1-9]|[12]\d|3[01])(?!\d)",
+        basename,
+        flags=re.IGNORECASE,
+    )
+    dekad_match = re.search(
+        r"(?<!\d)(?P<year>(?:19|20)\d{2})(?P<month>0[1-9]|1[0-2])"
+        r"[Dd](?P<dekad>[123])(?!\d)",
+        basename,
+    )
+    if date_match:
+        year, month, day = (int(date_match.group(key)) for key in ("year", "month", "day"))
+    elif dekad_match:
+        year = int(dekad_match.group("year"))
+        month = int(dekad_match.group("month"))
+        day = {1: 1, 2: 11, 3: 21}[int(dekad_match.group("dekad"))]
     else:
         raise ValueError(f"Unrecognized VIIRS filename format: {file_name}")
+
+    if day not in (1, 11, 21):
+        raise ValueError(f"VIIRS v2 date is not a dekad start: {file_name}")
+    _, last_day = calendar.monthrange(year, month)
+    period_order = {1: 0, 11: 1, 21: 2}[day]
+    period_type = f"D{period_order + 1}"
+    period_start = datetime(year, month, day).date()
+    period_end = datetime(year, month, {1: 10, 11: 20, 21: last_day}[day]).date()
+    period_id = period_start.isoformat()
 
     return {
         "year": year,
@@ -143,11 +167,9 @@ def viirs_target_filename(file_name):
       FldYYYYMid_MM.tif -> YYYY-MM-01.tif
       FldYYYYShm_MM.tif -> YYYY-MM-16.tif
 
-    End-of-month files are ignored and return None.
+    The local convention is the dekad start date (YYYY-MM-DD.tif).
     """
     parsed = parse_viirs_filename(file_name)
-    if parsed["period_type"] == "End":
-        return None
     return f"{parsed['period_start'].isoformat()}.tif"
 
 
@@ -179,37 +201,57 @@ def sort_viirs_files(file_names):
     return sorted(file_names, key=_sort_key)
 
 
-def list_remote_tif_files(base_url=VIIRS_BASE_URL):
+def list_remote_tif_files(base_url=VIIRS_BASE_URL, max_retries=3, retry_delay_seconds=2):
     """
-    List remote VIIRS TIF files in the source directory.
+    List remote VIIRS TIFFs, retrying transient connection and TLS failures.
+
+    A listing failure raises instead of returning an empty archive. Callers must
+    not rebuild historic outputs unless the remote inventory was verified.
     """
-    try:
-        response = requests.get(base_url, timeout=60)
-        response.raise_for_status()
-    except Exception as e:
-        logging.error(f"Error listing remote VIIRS files from {base_url}: {e}")
-        return []
+    last_error = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = requests.get(
+                base_url,
+                timeout=(20, 60),
+                headers={"User-Agent": "INFLOW-AI/1.0"},
+            )
+            response.raise_for_status()
+            break
+        except requests.RequestException as error:
+            last_error = error
+            if attempt < max_retries:
+                delay = retry_delay_seconds * (2 ** (attempt - 1))
+                logging.warning(
+                    "VIIRS listing attempt %d/%d failed: %s; retrying in %ss",
+                    attempt, max_retries, error, delay,
+                )
+                time.sleep(delay)
+    else:
+        raise RuntimeError(
+            f"Unable to verify remote VIIRS archive at {base_url} after "
+            f"{max_retries} attempts: {last_error}"
+        ) from last_error
 
     # Try to parse direct links from the HTML directory listing.
     tif_files = re.findall(r'href=["\']?([^"\'>]+\.tif)["\']?', response.text, flags=re.IGNORECASE)
     tif_files = [os.path.basename(f) for f in tif_files if f.lower().endswith(".tif")]
 
-    # Fallback to simple filename scraping if needed.
-    if not tif_files:
-        tif_files = re.findall(r'(Fld\d{4}(?:Mid|Shm|End)_\d{2}\.tif)', response.text, flags=re.IGNORECASE)
-
     tif_files = list(dict.fromkeys(os.path.basename(f) for f in tif_files))
 
-    # Keep only expected VIIRS files and ignore End files.
+    # Keep only files containing a valid v2 dekadal date.
     filtered_files = []
     for file_name in tif_files:
         try:
-            parsed = parse_viirs_filename(file_name)
-            if parsed["period_type"] != "End":
-                filtered_files.append(file_name)
+            parse_viirs_filename(file_name)
+            filtered_files.append(file_name)
         except ValueError:
             continue
 
+    if not filtered_files:
+        raise RuntimeError(
+            f"Remote VIIRS listing at {base_url} contained no valid dekadal TIFF files"
+        )
     return sort_viirs_files(filtered_files)
 
 
@@ -228,6 +270,7 @@ def download_inundation(file_list, download_path=VIIRS_DOWNLOAD_PATH, base_url=V
     max_retries = 3
     retry_delay_seconds = 2
 
+    failures = []
     for file_name in tqdm(file_list, desc="Downloading VIIRS inundation data"):
         file_url = urljoin(base_url, file_name)
         target_name = viirs_target_filename(file_name)
@@ -264,11 +307,17 @@ def download_inundation(file_list, download_path=VIIRS_DOWNLOAD_PATH, base_url=V
                     logging.error(
                         f"Failed to download {file_name} after {max_retries} attempts: {e}"
                     )
+                    failures.append((file_name, str(e)))
                 else:
                     logging.warning(
                         f"Retry {attempt}/{max_retries} for {file_name} after error: {e}"
                     )
                     time.sleep(retry_delay_seconds)
+    if failures:
+        details = "; ".join(f"{name}: {error}" for name, error in failures[:5])
+        raise RuntimeError(
+            f"Failed to download {len(failures)} VIIRS files; archive is incomplete. {details}"
+        )
 
 
 def get_sorted_tif_files(folder_path):
@@ -401,6 +450,49 @@ def get_historic_dates(data_path=VIIRS_TEMPORAL_PATH):
         return []
 
 
+def validate_local_viirs_v2(h5_file_path=VIIRS_H5_PATH,
+                            temporal_data_path=VIIRS_TEMPORAL_PATH,
+                            download_path=VIIRS_DOWNLOAD_PATH):
+    """Validate that cached v2 TIFF, HDF5, and temporal records agree exactly."""
+    if not all(os.path.exists(path) for path in (h5_file_path, temporal_data_path, download_path)):
+        return False, "one or more local VIIRS products are missing"
+    try:
+        with h5py.File(h5_file_path, "r") as hdf:
+            if VIIRS_DSET_NAME not in hdf:
+                return False, f"HDF5 dataset '{VIIRS_DSET_NAME}' is missing"
+            dataset = hdf[VIIRS_DSET_NAME]
+            expected_shape = tuple(cleaning_utils.MASK_REGIONS_REF_SHAPE)
+            if dataset.shape[1:] != expected_shape:
+                return False, f"HDF5 grid {dataset.shape[1:]} differs from {expected_shape}"
+            hdf_rows = dataset.shape[0]
+
+        temporal = pd.read_csv(temporal_data_path)
+        if "period_start" not in temporal or "file_name" not in temporal:
+            return False, "temporal CSV lacks period_start or file_name"
+        dates = pd.to_datetime(temporal["period_start"], errors="coerce")
+        if dates.isna().any() or not dates.dt.day.isin([1, 11, 21]).all():
+            return False, "temporal CSV contains invalid or non-dekadal dates"
+        if dates.duplicated().any():
+            return False, "temporal CSV contains duplicate periods"
+
+        local_files = {
+            normalize_viirs_identifier(name)
+            for name in os.listdir(download_path)
+            if name.lower().endswith(".tif")
+        }
+        temporal_files = {
+            normalize_viirs_identifier(name) for name in temporal["file_name"].astype(str)
+        }
+        if hdf_rows != len(temporal) or local_files != temporal_files:
+            return False, (
+                f"cache counts differ: HDF5={hdf_rows}, CSV={len(temporal)}, "
+                f"TIFFs={len(local_files)}"
+            )
+        return True, f"{hdf_rows} matching dekadal observations"
+    except Exception as error:
+        return False, str(error)
+
+
 def download_new_inundation(download_path=VIIRS_DOWNLOAD_PATH, burn_in_steps=18):
     """
     Download VIIRS inundation data for the last `burn_in_steps` files (to refresh them)
@@ -411,15 +503,16 @@ def download_new_inundation(download_path=VIIRS_DOWNLOAD_PATH, burn_in_steps=18)
         burn_in_steps (int): Number of timesteps to always refresh.
     """
     remote_files = list_remote_tif_files()
-    if not remote_files:
-        logging.info("No remote VIIRS files found.")
-        return
 
     remote_items = [(f, viirs_target_filename(f)) for f in remote_files]
     remote_items = [(src, tgt) for src, tgt in remote_items if tgt is not None]
 
-    historic_ids = {normalize_viirs_identifier(x) for x in get_historic_dates()}
-    if historic_ids:
+    local_ids = {
+        normalize_viirs_identifier(name)
+        for name in os.listdir(download_path)
+        if name.lower().endswith(".tif")
+    } if os.path.isdir(download_path) else set()
+    if local_ids:
         if len(remote_items) >= burn_in_steps:
             refresh_files = [src for src, _ in remote_items[-burn_in_steps:]]
         else:
@@ -427,7 +520,7 @@ def download_new_inundation(download_path=VIIRS_DOWNLOAD_PATH, burn_in_steps=18)
     else:
         refresh_files = []
 
-    new_files = [src for src, tgt in remote_items if tgt not in historic_ids]
+    new_files = [src for src, tgt in remote_items if tgt not in local_ids]
     files_to_download = []
     seen = set()
     for file_name in refresh_files + new_files:
@@ -443,6 +536,20 @@ def download_new_inundation(download_path=VIIRS_DOWNLOAD_PATH, burn_in_steps=18)
         download_inundation(files_to_download, download_path)
     else:
         logging.info("No new VIIRS files to download.")
+
+    expected_local = {target for _, target in remote_items}
+    actual_local = {
+        normalize_viirs_identifier(name)
+        for name in os.listdir(download_path)
+        if name.lower().endswith(".tif")
+    } if os.path.isdir(download_path) else set()
+    missing = sorted(expected_local.difference(actual_local))
+    if missing:
+        raise RuntimeError(
+            f"Local VIIRS v2 cache is missing {len(missing)} files from the verified "
+            f"remote archive (first missing: {missing[0]})"
+        )
+    return expected_local
 
 
 def crop_historic_data(file_path, temporal_data_path):
@@ -570,9 +677,28 @@ def build_viirs_temporal_dataframe(file_names, clipped_rasters, regions_gdf=None
         for i in range(len(regions_gdf)):
             region_data = regions_gdf.iloc[[i]]
             region_code = gridded_stats.region_to_code_dict[region_data["region"].values[0]]
-            region_area = cleaning_utils.mask_regions(region_data, np.array(clipped_rasters))
-            region_series = np.nansum(region_area, axis=(1, 2)) / (
-                total_cells - np.sum(np.isnan(region_area[0]))
+            if region_data.crs != cleaning_utils.MASK_REGIONS_REF_CRS:
+                region_data = region_data.to_crs(cleaning_utils.MASK_REGIONS_REF_CRS)
+            region_mask = rasterize(
+                [(geometry, 1) for geometry in region_data.geometry],
+                out_shape=cleaning_utils.MASK_REGIONS_REF_SHAPE,
+                transform=cleaning_utils.MASK_REGIONS_REF_TRANSFORM,
+                fill=0,
+                all_touched=True,
+                dtype=np.uint8,
+            ).astype(bool)
+            region_cells = int(region_mask.sum())
+            if region_cells == 0:
+                raise ValueError(f"Region {region_code} does not overlap the VIIRS grid.")
+            # Avoid np.where(..., np.nan), which promotes the complete historic
+            # raster stack to a multi-gigabyte float array for every region.
+            region_series = np.fromiter(
+                (
+                    np.count_nonzero(np.asarray(raster)[region_mask]) / region_cells
+                    for raster in clipped_rasters
+                ),
+                dtype=np.float64,
+                count=len(clipped_rasters),
             )
             inundation_temporal[f"percent_inundation_{region_code}"] = region_series
 
@@ -581,6 +707,126 @@ def build_viirs_temporal_dataframe(file_names, clipped_rasters, regions_gdf=None
         inundation_temporal = inundation_temporal.sort_values(sort_cols).reset_index(drop=True)
 
     return inundation_temporal
+
+
+def load_county_boundaries(counties_path=None):
+    """Load South Sudan ADM2 counties, falling back from an incomplete copy."""
+    requested = Path(counties_path or get_cfg(
+        "county_predictions.counties_path",
+        "data/maps/admin_boundaries/ssd_admbnda_adm2_imwg_nbs_20230829 2.shp",
+    ))
+    candidates = [requested]
+    if " 2" in requested.stem:
+        candidates.append(requested.with_name(requested.name.replace(" 2.shp", ".shp")))
+    candidates.append(Path(
+        "data/maps/admin_boundaries/ssd_admbnda_adm2_imwg_nbs_20230829.shp"
+    ))
+    errors = []
+    for candidate in dict.fromkeys(candidates):
+        if not candidate.exists():
+            errors.append(f"{candidate}: missing")
+            continue
+        try:
+            counties = gpd.read_file(candidate)
+        except Exception as exc:
+            errors.append(f"{candidate}: {exc}")
+            continue
+        required = {"ADM2_EN", "ADM2_PCODE", "ADM1_EN", "ADM1_PCODE", "geometry"}
+        missing = required.difference(counties.columns)
+        if missing:
+            errors.append(f"{candidate}: missing fields {sorted(missing)}")
+            continue
+        counties = counties[list(required)].copy()
+        counties = counties[counties.geometry.notna() & ~counties.geometry.is_empty].copy()
+        counties.attrs["source_path"] = str(candidate)
+        if candidate != requested:
+            logging.warning(
+                "Configured county shapefile %s could not be used; using %s.",
+                requested, candidate,
+            )
+        return counties
+    raise FileNotFoundError("Unable to load an ADM2 county shapefile: " + "; ".join(errors))
+
+
+def county_reference_labels(counties_path=None):
+    """Return ADM2 boundaries and a compact county-label VIIRS grid."""
+    counties = load_county_boundaries(counties_path)
+    source_path = counties.attrs.get("source_path")
+    counties = counties.to_crs(cleaning_utils.MASK_REGIONS_REF_CRS).reset_index(drop=True)
+    counties.attrs["source_path"] = source_path
+    labels = rasterize(
+        [(geometry, index + 1) for index, geometry in enumerate(counties.geometry)],
+        out_shape=cleaning_utils.MASK_REGIONS_REF_SHAPE,
+        transform=cleaning_utils.MASK_REGIONS_REF_TRANSFORM,
+        fill=0,
+        all_touched=True,
+        dtype=np.uint16,
+    )
+    counts = np.bincount(labels.ravel(), minlength=len(counties) + 1)[1:]
+    empty = np.flatnonzero(counts == 0)
+    if len(empty):
+        raise ValueError(
+            f"Counties do not overlap the VIIRS grid: "
+            f"{counties.iloc[empty]['ADM2_EN'].tolist()}"
+        )
+    return counties, labels
+
+
+def build_county_viirs_temporal_csv(
+    h5_file_path,
+    temporal_data_path,
+    output_path=None,
+    counties_path=None,
+):
+    """Aggregate the aligned VIIRS HDF5 into one historic series per county."""
+    output = Path(output_path or get_cfg(
+        "county_predictions.historic_csv",
+        "data/historic/viirs-aligned/inundation_viirs_county_temporal.csv",
+    ))
+    temporal = pd.read_csv(temporal_data_path)
+    counties, labels = county_reference_labels(counties_path)
+    with h5py.File(h5_file_path, "r") as hdf:
+        if VIIRS_DSET_NAME not in hdf:
+            raise KeyError(f"Dataset '{VIIRS_DSET_NAME}' not found in {h5_file_path}.")
+        dataset = hdf[VIIRS_DSET_NAME]
+        if len(temporal) != dataset.shape[0]:
+            raise ValueError(
+                f"County aggregation requires matching VIIRS rows: HDF5 has "
+                f"{dataset.shape[0]}, temporal CSV has {len(temporal)}."
+            )
+        metadata_columns = [
+            column for column in temporal.columns
+            if not column.startswith("percent_inundation")
+        ]
+        result = temporal[metadata_columns].copy()
+        if tuple(dataset.shape[-2:]) != tuple(labels.shape):
+            raise ValueError(
+                f"County labels have shape {labels.shape}, but VIIRS has "
+                f"shape {dataset.shape[-2:]}."
+            )
+        cell_counts = np.bincount(labels.ravel(), minlength=len(counties) + 1)[1:]
+        county_values = np.empty((dataset.shape[0], len(counties)), dtype=np.float64)
+        for time_index in range(dataset.shape[0]):
+            frame = np.asarray(dataset[time_index]) == 1
+            flooded = np.bincount(
+                labels[frame & (labels > 0)], minlength=len(counties) + 1
+            )[1:]
+            county_values[time_index] = flooded / cell_counts
+        for index, county in enumerate(counties.itertuples(index=False)):
+            result[f"percent_inundation_{county.ADM2_PCODE.lower()}"] = county_values[:, index]
+    output.parent.mkdir(parents=True, exist_ok=True)
+    result.to_csv(output, index=False)
+    mapping = counties.drop(columns="geometry").copy()
+    mapping["temporal_column"] = (
+        "percent_inundation_" + mapping["ADM2_PCODE"].str.lower()
+    )
+    mapping["viirs_grid_cells"] = np.bincount(
+        labels.ravel(), minlength=len(counties) + 1
+    )[1:].astype(int)
+    mapping["county_shapefile"] = counties.attrs.get("source_path", "unknown")
+    mapping.to_csv(output.with_name(output.stem + "_counties.csv"), index=False)
+    logging.info("Wrote %d county VIIRS histories to %s.", len(counties), output)
+    return output, counties, labels
 
 
 def _viirs_observation_dates(dataframe):
@@ -594,7 +840,7 @@ def _viirs_observation_dates(dataframe):
             "period_order",
             pd.Series(0, index=dataframe.index),
         )
-        days = np.where(period_order.eq(VIIRS_PERIOD_ORDER["Shm"]), 16, 1)
+        days = period_order.map({0: 1, 1: 11, 2: 21}).fillna(1).astype(int)
         return pd.to_datetime({
             "year": dataframe["year"],
             "month": dataframe["month"],
@@ -665,19 +911,43 @@ def _remove_drying_period_increases(series, dates):
     return cleaned
 
 
-def clean_viirs_temporal_dataframe(dataframe):
-    """Smooth and remove drying-season artifacts from VIIRS inundation series."""
+def clean_viirs_temporal_dataframe(
+    dataframe,
+    *,
+    apply_median_smoothing=None,
+    apply_drying_season_correction=None,
+):
+    """Optionally smooth and correct the VIIRS inundation series.
+
+    Both transformations are disabled unless explicitly enabled by an argument
+    or in ``runtime.viirs.processing`` configuration.
+    """
     cleaned = dataframe.copy()
     dates = _viirs_observation_dates(cleaned)
     value_columns = [column for column in cleaned if column.startswith("percent_inundation")]
+    if apply_median_smoothing is None:
+        apply_median_smoothing = bool(get_cfg(
+            "runtime.viirs.processing.apply_three_period_median_smoothing", False
+        ))
+    if apply_drying_season_correction is None:
+        apply_drying_season_correction = bool(get_cfg(
+            "runtime.viirs.processing.apply_drying_season_correction", False
+        ))
 
     for column in value_columns:
-        smoothed = pd.to_numeric(cleaned[column], errors="coerce").rolling(
-            window=3,
-            center=True,
-            min_periods=1,
-        ).median()
-        cleaned[column] = _remove_drying_period_increases(smoothed, dates)
+        values = pd.to_numeric(cleaned[column], errors="coerce")
+        if apply_median_smoothing:
+            values = values.rolling(window=3, center=True, min_periods=1).median()
+        if apply_drying_season_correction:
+            values = _remove_drying_period_increases(values, dates)
+        cleaned[column] = values
+
+    logging.info(
+        "VIIRS temporal transformations: three-period median smoothing=%s, "
+        "drying-season correction=%s",
+        apply_median_smoothing,
+        apply_drying_season_correction,
+    )
 
     return cleaned
 
@@ -719,12 +989,15 @@ def rebuild_viirs_history(download_path=VIIRS_DOWNLOAD_PATH,
     temp_csv_path = f"{temporal_data_path}.rebuild"
     try:
         with h5py.File(temp_h5_path, "w") as hdf:
-            hdf.create_dataset(
+            dataset = hdf.create_dataset(
                 VIIRS_DSET_NAME,
                 data=np.asarray(clipped_rasters, dtype=np.uint8),
                 maxshape=(None, *clipped_rasters[0].shape),
                 chunks=True,
             )
+            dataset.attrs["dataset_version"] = VIIRS_DATASET_VERSION
+            dataset.attrs["cadence"] = VIIRS_CADENCE
+            dataset.attrs["source_url"] = VIIRS_BASE_URL
         temporal.to_csv(temp_csv_path, index=False)
         os.replace(temp_h5_path, h5_file_path)
         os.replace(temp_csv_path, temporal_data_path)
@@ -744,7 +1017,8 @@ def rebuild_viirs_history(download_path=VIIRS_DOWNLOAD_PATH,
 
 def update_inundation(h5_file_path=VIIRS_H5_PATH,
                       download_path=VIIRS_DOWNLOAD_PATH,
-                      temporal_data_path=VIIRS_TEMPORAL_PATH):
+                      temporal_data_path=VIIRS_TEMPORAL_PATH,
+                      allow_offline_existing=False):
     """
     Process newly downloaded VIIRS data and combine it with existing data.
 
@@ -755,12 +1029,49 @@ def update_inundation(h5_file_path=VIIRS_H5_PATH,
     """
     try:
         has_existing_h5 = False
+        requires_v2_rebuild = False
         if os.path.exists(h5_file_path):
             with h5py.File(h5_file_path, 'r') as f:
                 if VIIRS_DSET_NAME in f:
                     viirs_historic = f[VIIRS_DSET_NAME]
                     logging.info(f"Existing VIIRS data shape: {viirs_historic.shape}")
                     has_existing_h5 = True
+                    requires_v2_rebuild = (
+                        viirs_historic.attrs.get("dataset_version") != VIIRS_DATASET_VERSION
+                        or viirs_historic.attrs.get("cadence") != VIIRS_CADENCE
+                    )
+
+        # Download before migration so the replacement is built only after the
+        # complete remote v2 archive is available locally.
+        try:
+            verified_remote_files = download_new_inundation(download_path)
+        except RuntimeError as error:
+            valid, details = validate_local_viirs_v2(
+                h5_file_path=h5_file_path,
+                temporal_data_path=temporal_data_path,
+                download_path=download_path,
+            )
+            if not allow_offline_existing or not valid:
+                raise
+            logging.warning(
+                "Remote VIIRS update unavailable; using validated local cache (%s). "
+                "No freshness check was performed. Cause: %s",
+                details,
+                error,
+            )
+            with h5py.File(h5_file_path, "r+") as hdf:
+                dataset = hdf[VIIRS_DSET_NAME]
+                dataset.attrs["dataset_version"] = VIIRS_DATASET_VERSION
+                dataset.attrs["cadence"] = VIIRS_CADENCE
+                dataset.attrs["source_url"] = VIIRS_BASE_URL
+            return
+        if requires_v2_rebuild:
+            logging.info(
+                "Replacing legacy VIIRS history from %d verified v2 dekadal files.",
+                len(verified_remote_files),
+            )
+            rebuild_viirs_history(download_path, h5_file_path, temporal_data_path)
+            return
 
         if has_existing_h5 and os.path.exists(temporal_data_path):
             # Crop historic data if historic spatial and temporal data are not the same size
@@ -784,9 +1095,6 @@ def update_inundation(h5_file_path=VIIRS_H5_PATH,
                 f"Historic VIIRS dataset not found at {h5_file_path}. "
                 "Bootstrapping dataset from newly processed files."
             )
-
-        # Update VIIRS data by downloading new files
-        download_new_inundation(download_path)
 
         # Get the sorted TIF files after the update
         sorted_files = get_sorted_tif_files(download_path)
@@ -831,6 +1139,9 @@ def update_inundation(h5_file_path=VIIRS_H5_PATH,
                     maxshape=(None, *np.array(new_clipped_tif_files).shape[1:]),
                     chunks=True,
                 )
+                dset.attrs["dataset_version"] = VIIRS_DATASET_VERSION
+                dset.attrs["cadence"] = VIIRS_CADENCE
+                dset.attrs["source_url"] = VIIRS_BASE_URL
             logging.info(f"Updated VIIRS data shape: {dset.shape}")
 
         # Update temporal data
@@ -855,5 +1166,139 @@ def update_inundation(h5_file_path=VIIRS_H5_PATH,
 
     except Exception as e:
         logging.error(f"Error processing new VIIRS data: {e}")
+        raise
 
     logging.info("VIIRS inundation processing complete.\\n")
+
+
+def _latest_preliminary_catalogue():
+    """Return the latest published preliminary version for every dekad."""
+    response = _request_with_retries(VIIRS_PRELIM_CATALOGUE_URL)
+    catalogue = pd.read_csv(StringIO(response.text))
+    required = {"dekad", "version", "file"}
+    missing = required.difference(catalogue.columns)
+    if missing:
+        raise ValueError(f"VIIRS preliminary catalogue is missing {sorted(missing)}")
+    catalogue["dekad"] = pd.to_datetime(catalogue["dekad"], errors="coerce")
+    catalogue["version"] = pd.to_numeric(catalogue["version"], errors="coerce")
+    catalogue = catalogue.dropna(subset=["dekad", "version", "file"])
+    latest = catalogue.sort_values(["dekad", "version"]).drop_duplicates("dekad", keep="last")
+    return latest.sort_values("dekad").reset_index(drop=True)
+
+
+def _download_latest_preliminary(rows, download_path):
+    folder = Path(download_path)
+    folder.mkdir(parents=True, exist_ok=True)
+    local_files = []
+    for row in rows.itertuples(index=False):
+        remote_basename = Path(str(row.file)).name
+        destination = folder / remote_basename
+        if not destination.exists() or destination.stat().st_size == 0:
+            response = _request_with_retries(
+                urljoin(VIIRS_PRELIM_BASE_URL, remote_basename), stream=True
+            )
+            partial = destination.with_suffix(destination.suffix + ".part")
+            try:
+                with partial.open("wb") as output:
+                    for chunk in response.iter_content(chunk_size=4 * 1024 * 1024):
+                        if chunk:
+                            output.write(chunk)
+                if partial.stat().st_size == 0:
+                    raise RuntimeError(f"Empty VIIRS preliminary download: {remote_basename}")
+                partial.replace(destination)
+            finally:
+                partial.unlink(missing_ok=True)
+        local_files.append(destination.name)
+    return local_files
+
+
+def prepare_operational_inundation(
+    historic_h5_path=VIIRS_H5_PATH,
+    historic_temporal_path=VIIRS_TEMPORAL_PATH,
+    prelim_download_path=VIIRS_PRELIM_DOWNLOAD_PATH,
+):
+    """Build a final-history plus latest-preliminary operational VIIRS view.
+
+    The immutable historical HDF5/CSV are never modified here. Preliminary
+    maps whose dekads already exist in the final archive are excluded.
+    """
+    operational_h5 = Path(get_cfg(
+        "paths.operational.viirs_h5", "data/operational/inundation_viirs.h5"
+    ))
+    prelim_h5 = Path(get_cfg(
+        "paths.operational.viirs_prelim_h5", "data/operational/inundation_viirs_prelim.h5"
+    ))
+    operational_csv = Path(get_cfg(
+        "paths.operational.viirs_temporal", "data/operational/inundation_viirs_temporal.csv"
+    ))
+    historic_h5 = Path(historic_h5_path).resolve()
+    historic_csv = Path(historic_temporal_path)
+    if not historic_h5.exists() or not historic_csv.exists():
+        raise FileNotFoundError(
+            "Final VIIRS HDF5 and temporal CSV must exist before operational overlay"
+        )
+
+    final_temporal = pd.read_csv(historic_csv)
+    final_dates = set(pd.to_datetime(_viirs_observation_dates(final_temporal)).dt.normalize())
+    latest = _latest_preliminary_catalogue()
+    selected = latest[~latest["dekad"].dt.normalize().isin(final_dates)].copy()
+    if selected.empty:
+        logging.info("No non-final VIIRS preliminary dekads are currently available.")
+        return str(historic_h5), str(historic_csv), str(VIIRS_DOWNLOAD_PATH)
+
+    local_files = _download_latest_preliminary(selected, prelim_download_path)
+    catchments = load_shapefile(INFLOW_CATCHMENTS_PATH)
+    if catchments is None or catchments.empty:
+        raise ValueError(f"No catchment geometries found in {INFLOW_CATCHMENTS_PATH}")
+    arrays, names, _ = process_and_clip_rasters(
+        local_files, prelim_download_path, catchments
+    )
+    if len(arrays) != len(local_files):
+        raise RuntimeError("One or more operational VIIRS preliminary maps could not be processed")
+
+    prelim_temporal = build_viirs_temporal_dataframe(
+        names, arrays, regions_gdf=cleaning_utils.extract_regions()
+    )
+    prelim_temporal["map_status"] = "preliminary"
+    version_by_date = dict(zip(
+        selected["dekad"].dt.normalize(), selected["version"].astype(int)
+    ))
+    prelim_temporal["preliminary_version"] = pd.to_datetime(
+        prelim_temporal["period_start"]
+    ).dt.normalize().map(version_by_date)
+    final_temporal["map_status"] = "final"
+    final_temporal["preliminary_version"] = np.nan
+    combined = pd.concat([final_temporal, prelim_temporal], ignore_index=True, sort=False)
+    combined = combined.sort_values(["year", "month", "period_order"]).reset_index(drop=True)
+
+    operational_h5.parent.mkdir(parents=True, exist_ok=True)
+    operational_csv.parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(prelim_h5, "w") as output:
+        output.create_dataset(
+            VIIRS_DSET_NAME, data=np.asarray(arrays, dtype=np.uint8), chunks=True
+        )
+    with h5py.File(historic_h5, "r") as source:
+        historic_shape = source[VIIRS_DSET_NAME].shape
+        historic_dtype = source[VIIRS_DSET_NAME].dtype
+    layout = h5py.VirtualLayout(
+        shape=(historic_shape[0] + len(arrays), *historic_shape[1:]),
+        dtype=historic_dtype,
+    )
+    layout[:historic_shape[0]] = h5py.VirtualSource(
+        str(historic_h5), VIIRS_DSET_NAME, shape=historic_shape
+    )
+    prelim_shape = (len(arrays), *historic_shape[1:])
+    layout[historic_shape[0]:] = h5py.VirtualSource(
+        str(prelim_h5.resolve()), VIIRS_DSET_NAME, shape=prelim_shape
+    )
+    with h5py.File(operational_h5, "w", libver="latest") as output:
+        dataset = output.create_virtual_dataset(VIIRS_DSET_NAME, layout, fillvalue=0)
+        dataset.attrs["historical_source"] = str(historic_h5)
+        dataset.attrs["preliminary_source"] = str(prelim_h5.resolve())
+        dataset.attrs["preliminary_rows"] = len(arrays)
+    combined.to_csv(operational_csv, index=False)
+    logging.info(
+        "Operational VIIRS view contains %d final and %d latest preliminary dekads.",
+        historic_shape[0], len(arrays),
+    )
+    return str(operational_h5), str(operational_csv), str(Path(prelim_download_path))

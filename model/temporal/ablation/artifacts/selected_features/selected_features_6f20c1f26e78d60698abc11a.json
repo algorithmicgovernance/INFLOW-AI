@@ -1,0 +1,60 @@
+{
+  "best_k": 16,
+  "configuration_signature": {
+    "autoregressive": false,
+    "feature_block_name": "historical_only",
+    "include_ecmwf_hindcasts": false,
+    "include_feature_lag_features": false,
+    "include_target_lag_features": false,
+    "inundation_product": "viirs",
+    "lead_period": 2,
+    "target_type": "seasonally_differenced",
+    "training_cutoff_date": "2025-07-21"
+  },
+  "cv_mean_mae_by_k": {
+    "16": 0.03985948488116264,
+    "32": 0.051752492785453796,
+    "76": 0.05175362899899483,
+    "8": 0.04005460813641548
+  },
+  "dataset_fingerprint": "2962e70b2913437788b898fd0870b1c3c46fc450b0dd44d51e089c8b6fa2def9",
+  "removed_constant_features": [],
+  "removed_correlated_features": [
+    "moisture_ssd",
+    "cumulative_rainfall_ssd",
+    "cumulative_rainfall_ceq",
+    "cumulative_rainfall_eeq",
+    "cumulative_rainfall_jon",
+    "cumulative_rainfall_lak",
+    "cumulative_rainfall_nbg",
+    "cumulative_rainfall_uni",
+    "cumulative_rainfall_upn",
+    "cumulative_rainfall_war",
+    "cumulative_rainfall_wbg",
+    "cumulative_rainfall_weq",
+    "cumulative_rainfall_aby",
+    "rainfall_ssd",
+    "year",
+    "soi_sd",
+    "day_of_year"
+  ],
+  "selected_feature_names": [
+    "moisture_eeq",
+    "moisture_nbg",
+    "cumulative_rainfall",
+    "ninoANOM",
+    "ninoNINO4",
+    "ninoANOM.3",
+    "soi_anom",
+    "wtio",
+    "setio",
+    "sin_doy",
+    "rainfall_eeq_cumulative_scaled",
+    "rainfall_jon_cumulative_scaled",
+    "rainfall_lak_cumulative_scaled",
+    "rainfall_uni_cumulative_scaled",
+    "rainfall_upn_cumulative_scaled",
+    "rainfall_war_cumulative_scaled"
+  ],
+  "selection_model_type": "elastic_net"
+}

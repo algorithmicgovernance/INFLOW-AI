@@ -7,9 +7,8 @@ from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import shap
 
-from model.ablation.deployment import (
+from model.temporal.runtime.temporal_deployment import (
     _add_optional_feature_blocks,
     _add_post_scale_cumulative_features,
     _apply_saved_feature_transforms,
@@ -18,8 +17,8 @@ from model.ablation.deployment import (
     _restore_model_wrapper,
     _sync_runtime_config_from_row,
 )
-from model.ablation.data_pipeline import _build_temporal_feature_table, _target_transform
-from model.ablation.area_reconversion import target_area_scale_km2
+from model.temporal.ablation.temporal_data_pipeline import _build_temporal_feature_table, _target_transform
+from model.temporal.runtime.area_reconversion import target_area_scale_km2
 from explanations.variable_names import human_readable_variable_name
 
 
@@ -29,6 +28,10 @@ def export_lead_waterfall_plots(row: dict[str, Any], output_dir: str | Path) -> 
     The feature table, saved train-only transforms, selected feature names, and
     runtime-retrained weights are the same objects used by deployment inference.
     """
+    # SHAP is optional at inference time and is imported lazily so a binary or
+    # NumPy compatibility problem cannot prevent the forecasts themselves.
+    import shap
+
     _sync_runtime_config_from_row(row)
     output_path = Path(output_dir) / "explanations"
     output_path.mkdir(parents=True, exist_ok=True)
@@ -78,7 +81,7 @@ def export_lead_waterfall_plots(row: dict[str, Any], output_dir: str | Path) -> 
     generated: list[Path] = []
     contribution_percentages: dict[str, list[dict[str, float | str]]] = {}
     history_raw = observed_target_history["target_raw"].to_numpy(dtype=np.float64).tolist()
-    season = 24 if product == "viirs" else 36
+    season = 36
 
     for lead in range(1, lead_count + 1):
         selected_features = selected_by_lead.get(lead, [])

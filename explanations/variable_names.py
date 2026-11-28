@@ -31,6 +31,8 @@ VARIABLE_NAME_MAP = {
     "dmi": "Dipole Mode Index",
     "wtio": "Western Tropical Indian Ocean index",
     "setio": "Southeastern Tropical Indian Ocean index",
+    "sin_doy": "Seasonal climatology",
+    "cos_doy": "Seasonal climatology",
 }
 
 REGION_CODE_TO_NAME = {code: name for name, code in region_to_code_dict.items()}
@@ -38,11 +40,11 @@ REGION_CODE_TO_NAME = {code: name for name, code in region_to_code_dict.items()}
 
 def _lag_label(lag: int, target_product: str | None) -> str:
     if str(target_product).strip().lower() == "viirs":
-        weeks = lag * 2
-        if weeks % 4 == 0:
-            months = weeks // 4
+        days = lag * 10
+        if days % 30 == 0:
+            months = days // 30
             return f"-{months} {'month' if months == 1 else 'months'}"
-        return f"-{weeks} weeks"
+        return f"-{days} days"
     return f"-{lag} {'period' if lag == 1 else 'periods'}"
 
 
